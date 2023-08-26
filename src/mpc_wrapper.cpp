@@ -22,10 +22,10 @@
  */
 
 
-#include "rpg_mpc/mpc_wrapper.h"
+#include "mpcc/mpc_wrapper.h"
 
 
-namespace rpg_mpc {
+namespace mpcc {
 
 // Default Constructor.
 template <typename T>
@@ -51,21 +51,25 @@ MpcWrapper<T>::MpcWrapper()
 
   acado_inputs_ = kHoverInput_.replicate(1, kSamples).template cast<float>();
 
+// TODO: reference_states (p t vt) 와 states (p q v t vt) 의 dimension이 다름.
+// hover_state에 p q v 이므로 이를 p t vt로 변경필요
   // Initialize references y and yN.
   acado_reference_states_.block(0, 0, kStateSize, kSamples) =
     hover_state.replicate(1, kSamples).template cast<float>();
+  
+// kCostSize-kStateSize = 0 인데 왜 Zero로 초기화하는지?
+// DONE: kCostSize-kStateSize를 0으로 변경
+  acado_reference_states_.block(kStateSize, 0, 0, kSamples) =
+    Eigen::Matrix<float, 0, kSamples>::Zero();
 
-  acado_reference_states_.block(kStateSize, 0, kCostSize-kStateSize, kSamples) =
-    Eigen::Matrix<float, kCostSize-kStateSize, kSamples>::Zero();
-
-  acado_reference_states_.block(kCostSize, 0, kInputSize, kSamples) =
+  acado_reference_states_.block(kStateSize, 0, kInputSize, kSamples) =
     kHoverInput_.replicate(1, kSamples);
 
   acado_reference_end_state_.segment(0, kStateSize) =
     hover_state.template cast<float>();
 
-  acado_reference_end_state_.segment(kStateSize, kCostSize-kStateSize) =
-    Eigen::Matrix<float, kCostSize-kStateSize, 1>::Zero();
+  acado_reference_end_state_.segment(kStateSize, 0) =
+    Eigen::Matrix<float, 0, 1>::Zero();
 
   // Initialize Cost matrix W and WN.
   if(!(acado_W_.trace()>0.0))
@@ -73,14 +77,6 @@ MpcWrapper<T>::MpcWrapper()
     acado_W_ = W_.replicate(1, kSamples).template cast<float>();
     acado_W_end_ = WN_.template cast<float>();
   }
-
-  // Initialize online data.
-  Eigen::Matrix<T, 3, 1> p_B_C(0, 0, 0);
-  Eigen::Quaternion<T> q_B_C(1, 0, 0, 0);
-  Eigen::Matrix<T, 3, 1> point_of_interest(0, 0, -1000);
-
-  setCameraParameters(p_B_C, q_B_C);
-  setPointOfInterest(point_of_interest);
 
   // Initialize solver.
   acado_initializeNodesByForwardSimulation();
@@ -91,7 +87,7 @@ MpcWrapper<T>::MpcWrapper()
 // Constructor with cost matrices as arguments.
 template <typename T>
 MpcWrapper<T>::MpcWrapper(
-  const Eigen::Ref<const Eigen::Matrix<T, kCostSize, kCostSize>> Q,
+  const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize>> Q,
   const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kInputSize>> R)
 {
   setCosts(Q, R);
@@ -101,7 +97,7 @@ MpcWrapper<T>::MpcWrapper(
 // Set cost matrices with optional scaling.
 template <typename T>
 bool MpcWrapper<T>::setCosts(
-  const Eigen::Ref<const Eigen::Matrix<T, kCostSize, kCostSize>> Q,
+  const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize>> Q,
   const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kInputSize>> R,
   const T state_cost_scaling, const T input_cost_scaling)
 {
@@ -110,23 +106,32 @@ bool MpcWrapper<T>::setCosts(
     ROS_ERROR("MPC: Cost scaling is wrong, must be non-negative!");
     return false;
   }
-  W_.block(0, 0, kCostSize, kCostSize) = Q;
-  W_.block(kCostSize, kCostSize, kInputSize, kInputSize) = R;
-  WN_ = W_.block(0, 0, kCostSize, kCostSize);
+  // Set kRefSize*kRefSize size of Matrix W_ as diagonal matrix Q \\ R
+  // W_ = [Q ]
+  //      [ R]
+  W_.block(0, 0, kRefSize, kRefSize) = Q;
+  W_.block(kStateSize, kStateSize, kInputSize, kInputSize) = R;
+
+  WN_ = W_.block(0, 0, kRefSize, kRefSize);
 
   float state_scale{1.0};
   float input_scale{1.0};
+  // Set cost matrix acadoVariables.W from k=0,1,...,N with scaled W_
   for(int i=0; i<kSamples; i++)
   { 
     state_scale = exp(- float(i)/float(kSamples)
       * float(state_cost_scaling));
     input_scale = exp(- float(i)/float(kSamples)
       * float(input_cost_scaling));
-    acado_W_.block(0, i*kRefSize, kCostSize, kCostSize) =
-      W_.block(0, 0, kCostSize, kCostSize).template cast<float>()
+    acado_W_.block(0, i*kRefSize, kStateSize, kStateSize) =
+      W_.block(0, 0, kStateSize, kStateSize).template cast<float>()
       * state_scale;
-    acado_W_.block(kCostSize, i*kRefSize+kCostSize, kInputSize, kInputSize) =
-      W_.block(kCostSize, kCostSize, kInputSize, kInputSize
+    acado_W_.block(kStateSize, i*kRefSize+kStateSize, kInputSize, kInputSize) =
+      W_.block(kStateSize, kStateSize, kInputSize, kInputSize
+        ).template cast<float>() * input_scale;
+    
+    acado_W_.block(kStateSize, i*kRefSize+kStateSize, kInputSize, kInputSize) =
+      W_.block(kStateSize, kStateSize, kInputSize, kInputSize
         ).template cast<float>() * input_scale;
   } 
   acado_W_end_ = WN_.template cast<float>() * state_scale;
@@ -179,33 +184,7 @@ bool MpcWrapper<T>::setLimits(T min_thrust, T max_thrust,
   return true;
 }
 
-// Set camera extrinsics.
-template <typename T>
-bool MpcWrapper<T>::setCameraParameters(
-  const Eigen::Ref<const Eigen::Matrix<T, 3, 1>>& p_B_C,
-  Eigen::Quaternion<T>& q_B_C)
-{
-  acado_online_data_.block(3, 0, 3, ACADO_N+1)
-    = p_B_C.replicate(1, ACADO_N+1).template cast<float>();
-
-  Eigen::Matrix<T, 4, 1> q_B_C_mat(
-    q_B_C.w(), q_B_C.x(), q_B_C.y(), q_B_C.z());
-  acado_online_data_.block(6, 0, 4, ACADO_N+1)
-    = q_B_C_mat.replicate(1, ACADO_N+1).template cast<float>();
-
-  return true;
-}
-
-// Set the point of interest. Perception cost should be non-zero.
-template <typename T>
-bool MpcWrapper<T>::setPointOfInterest(
-  const Eigen::Ref<const Eigen::Matrix<T, 3, 1>>& position)
-{
-  acado_online_data_.block(0, 0, 3, ACADO_N+1)
-    = position.replicate(1, ACADO_N+1).template cast<float>();
-  return true;
-}
-
+// DONE: kCostSize-kStateSize 를 0으로 변경, kCostSize를 kStateSize로 변경
 // Set a reference pose.
 template <typename T>
 bool MpcWrapper<T>::setReferencePose(
@@ -214,17 +193,17 @@ bool MpcWrapper<T>::setReferencePose(
   acado_reference_states_.block(0, 0, kStateSize, kSamples) =
     state.replicate(1, kSamples).template cast<float>();
 
-  acado_reference_states_.block(kStateSize, 0, kCostSize-kStateSize, kSamples) =
-    Eigen::Matrix<float, kCostSize-kStateSize, kSamples>::Zero();
+  acado_reference_states_.block(kStateSize, 0, 0, kSamples) =
+    Eigen::Matrix<float, 0, kSamples>::Zero();
 
-  acado_reference_states_.block(kCostSize, 0, kInputSize, kSamples) =
+  acado_reference_states_.block(kStateSize, 0, kInputSize, kSamples) =
     kHoverInput_.replicate(1, kSamples);
 
   acado_reference_end_state_.segment(0, kStateSize) =
     state.template cast<float>();
 
-  acado_reference_end_state_.segment(kStateSize, kCostSize-kStateSize) =
-    Eigen::Matrix<float, kCostSize-kStateSize, 1>::Zero();
+  acado_reference_end_state_.segment(kStateSize, 0) =
+    Eigen::Matrix<float, 0, 1>::Zero();
 
   acado_initializeNodesByForwardSimulation();
   return true;
@@ -242,19 +221,32 @@ bool MpcWrapper<T>::setTrajectory(
   acado_reference_states_.block(0, 0, kStateSize, kSamples) =
     states.block(0, 0, kStateSize, kSamples).template cast<float>();
 
-  acado_reference_states_.block(kStateSize, 0, kCostSize-kStateSize, kSamples) =
-    Eigen::Matrix<float, kCostSize-kStateSize, kSamples>::Zero();
+  acado_reference_states_.block(kStateSize, 0, 0, kSamples) =
+    Eigen::Matrix<float, 0, kSamples>::Zero();
 
-  acado_reference_states_.block(kCostSize, 0, kInputSize, kSamples) =
+  acado_reference_states_.block(kStateSize, 0, kInputSize, kSamples) =
     inputs.block(0, 0, kInputSize, kSamples).template cast<float>();
 
   acado_reference_end_state_.segment(0, kStateSize) =
     states.col(kSamples).template cast<float>();
-  acado_reference_end_state_.segment(kStateSize, kCostSize-kStateSize) =
-    Eigen::Matrix<float, kCostSize-kStateSize, 1>::Zero();
+  acado_reference_end_state_.segment(kStateSize, 0) =
+    Eigen::Matrix<float, 0, 1>::Zero();
+
+  // std::cout<<"acado_reference_states_:"<<acado_reference_states_<<std::endl;
 
   return true;
 }
+
+// Update dynamic using adaptive control module
+template <typename T>
+bool MpcWrapper<T>::setadaptiveacc(
+  const Eigen::Ref<const Eigen::Matrix<T, 3, 1>>& ada_acc)
+{
+  acado_online_data_.block(0, 0, 3, ACADO_N+1)
+    = ada_acc.replicate(1, ACADO_N+1).template cast<float>();
+  return true;
+}
+
 
 // Reset states and inputs and calculate new solution.
 template <typename T>

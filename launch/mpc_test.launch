@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>  
+  <param name="/control_hz" value="200.0" />
+    <!-- Throttle mapping -->
+  <param name="/norm_thrust_const" value="0.06" />
+  <param name="/norm_thrust_offset" value="0.1" />
+  <param name="/max_thrust" value="1.0"/>
+  <param name="/min_thrust" value="0.1"/>
+
+  <param name="/max_throttle" value="20.0"/>
+  <param name="/min_throttle" value="2.0"/>
+  <param name="/max_bodyrate_xy" value="1.5"/>
+  <param name="/max_bodyrate_z" value="3.0"/>
+
+  <param name="/Q_pos_xy" value="200.0"/>
+  <param name="/Q_pos_z" value="500.0"/>
+  <param name="/Q_attitude" value="50.0"/>
+  <param name="/Q_velocity" value="5.0"/>
+  <param name="/R_thrust" value="5.0"/>
+  <param name="/R_pitchroll" value="10.0"/>
+  <!-- <param name="/R_pitchroll" value="50.0"/> -->
+  <param name="/R_yaw" value="5.0"/>
+  <param name="/state_cost_exponential" value="0.0"/>
+  <param name="/input_cost_exponential" value="0.0"/>
+
+  <!-- L1 param -->
+  <param name="/cutoff_freq_m" value="0.5"/> <!-- 1.0 -->
+  <param name="/cutoff_freq_um" value="0.5"/>
+
+  <param name="/As_1" value="0.75"/>
+  <param name="/As_2" value="0.75"/>
+  <param name="/As_3" value="0.75"/>
+  <param name="/As_4" value="0.75"/>
+  <param name="/As_5" value="0.75"/>
+  <param name="/As_6" value="0.75"/>
+
+  <param name="/K_adaacc" value="1.0"/>
+
+  <!-- false: baseline // true: baseline+L1 -->
+  <param name="/L1_on" value="true"/>
+
+  <param name="/debug" value="true"/> 
+
+  <node pkg="sh_mpc" type="mpc_test_node" name="mpc_test_node" output="screen" />
+    
+</launch>

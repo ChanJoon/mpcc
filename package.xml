@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>rpg_mpc</name>
+  <name>mpcc</name>
   <version>0.0.0</version>
-  <description>Model Predictive Control for Quadrotors</description>
+  <description>Model Predictive Contouring Control for Quadrotors</description>
 
-  <maintainer email="foehn@ifi.uzh.ch">foehnph</maintainer>
+  <maintainer email="as06047@yonsei.ac.kr">ChanJoon</maintainer>
 
   <license>GNU GPL</license>
 
@@ -12,12 +12,12 @@
   <buildtool_depend>catkin_simple</buildtool_depend>
 
 
-  <depend>autopilot</depend>
   <depend>geometry_msgs</depend>
-  <depend>quadrotor_common</depend>
   <depend>roscpp</depend>
   <depend>std_msgs</depend>
-  <depend>trajectory_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>mavros_msgs</depend>
+  <depend>tf</depend>
 
   <export>
   </export>
