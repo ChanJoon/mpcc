@@ -1,3 +1,46 @@
+# Model Predicive Contouring Control
+
+### Updates(23-08-26)
+
+- [quadrotor_model_thrustrates.cpp](model/quadrotor_model_thrustrates.cpp): CMPCC $x^TQx$ 부분 반영(아래 cost function 참조)
+- [mpc_wrapper](include/mpcc/mpc_wrapper.h):
+
+  - 기존 sh_mpc에서는 `kStateSize` 10, `kInputSize` 4, `kRefSize` 14, `kCostSize` 10 이었음.
+  - mpc에서는 `kRefSize` = `kStateSize` + `kInputSize` 이고, `kCostSize`는 hN 함수에 대한 cost weigt matrix dimension으로 사용됨. 현재 mpcc acado 모델에서는 `kRefSize`=5 < `kStateSize`=13 이므로 kCostSize를 제거하거나 맞게 변경함.
+  - mpc에서는 $x^TQx+u^TRx=state^TWstate$ 로 acado QP에 넣어주는데 mpcc에서는 R=0으로 사용하고 $x^TQx$만 사용하고자, `mpc_wrapper`에서 `Q`의 크기를 `kRefSize`로 변경함.
+- [mpc_test.h](include/mpcc/mpc_test.h): `mpc_wrapper`에 맞게 `Eigen::Matrix Q`를 선언
+
+### TODO List
+
+  - [ ]: Update acado model to include $-\rho\cdot v_t$
+  - [ ]: Initialize `acado_reference_states_`, `acado_reference_end_states_`, `acado_W_` and `acado_W_end_` accordingly
+  - [ ]: Cost weight matrix should be assigned dynamically
+  - [ ]: [mpc_test.h](include/mpcc/mpc_test.h)
+  - [ ]: Test roslaunch and parameter tuning
+
+### Cost function 
+
+$$\begin{align}J&=\sum_{k=1}^N\{(\mu^{(k)}-\mu_p(t^{(k)}))^2-\rho\cdot v_t^{(k)}\}\\
+&=\sum_{k=1}^N\{(\mu^{(k)}-\mu_p(\theta^{(k)})-v_p(\theta^{(k)})\cdot (t^{(k)}-\theta^{(k)}))^2-\rho\cdot v_t^{(k)}\}\\
+&=\sum_{k=1}^N\begin{bmatrix}\mu\\t\end{bmatrix}^T
+\begin{bmatrix}1 & -v_p(\theta)\\-v_p(\theta)&v_p^2(\theta)\end{bmatrix}
+\begin{bmatrix}\mu\\t\end{bmatrix}
++\begin{bmatrix}2(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\\-2v_p(\theta)(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\\-\rho\end{bmatrix}^T
+\begin{bmatrix}\mu\\t\\v_t\end{bmatrix}\end{align}$$
+
+*References*
+ - Falanga, Davide, et al. "PAMPC: Perception-aware model predictive control for quadrotors." 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2018. https://doi.org/10.48550/arXiv.1804.04811
+ - Ji, Jialin, et al. "Cmpcc: Corridor-based model predictive contouring control for aggressive drone flight." Experimental Robotics: The 17th International Symposium. Springer International Publishing, 2021. https://doi.org/10.48550/arXiv.2007.03271
+ - Romero, Angel, et al. "Model predictive contouring control for time-optimal quadrotor flight." IEEE Transactions on Robotics 38.6 (2022): 3340-3356. https://doi.org/10.48550/arXiv.2108.13205
+
+
+
+
+
+
+
+
+---
 # Model Predictive Control for Quadrotors with extension to Perception-Aware MPC
 Model Predictive Control for Quadrotors by "Robotics and Perception Group" at the Dep. of Informatics, "University of Zurich", and Dep. of Neuroinformatics, ETH and University of Zurich.
 
