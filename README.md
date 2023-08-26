@@ -12,11 +12,11 @@
 
 ### TODO List
 
-  - [ ]: Update acado model to include $-\rho\cdot v_t$
-  - [ ]: Initialize `acado_reference_states_`, `acado_reference_end_states_`, `acado_W_` and `acado_W_end_` accordingly
-  - [ ]: Cost weight matrix should be assigned dynamically
-  - [ ]: [mpc_test.h](include/mpcc/mpc_test.h)
-  - [ ]: Test roslaunch and parameter tuning
+  - [ ] : Update acado model to include $-\rho\cdot v_t$
+  - [ ] : Initialize `acado_reference_states_`, `acado_reference_end_states_`, `acado_W_` and `acado_W_end_` accordingly
+  - [ ] : Cost weight matrix should be assigned dynamically
+  - [ ] : [mpc_test.h](include/mpcc/mpc_test.h)
+  - [ ] : Test roslaunch and parameter tuning
 
 ### Cost function 
 
