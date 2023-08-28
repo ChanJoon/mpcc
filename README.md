@@ -22,11 +22,11 @@
 
 $$\begin{align}J&=\sum_{k=1}^N\{(\mu^{(k)}-\mu_p(t^{(k)}))^2-\rho\cdot v_t^{(k)}\}\\
 &=\sum_{k=1}^N\{(\mu^{(k)}-\mu_p(\theta^{(k)})-v_p(\theta^{(k)})\cdot (t^{(k)}-\theta^{(k)}))^2-\rho\cdot v_t^{(k)}\}\\
-&=\sum_{k=1}^N\begin{bmatrix}\mu\\t\end{bmatrix}^T
-\begin{bmatrix}1 & -v_p(\theta)\\-v_p(\theta)&v_p^2(\theta)\end{bmatrix}
-\begin{bmatrix}\mu\\t\end{bmatrix}
-+\begin{bmatrix}2(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\\-2v_p(\theta)(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\\-\rho\end{bmatrix}^T
-\begin{bmatrix}\mu\\t\\v_t\end{bmatrix}\end{align}$$
+&=\sum_{k=1}^N\begin{bmatrix}\mu\cr t\end{bmatrix}^T
+\begin{bmatrix}1 & -v_p(\theta)\cr -v_p(\theta)&v_p^2(\theta)\end{bmatrix}
+\begin{bmatrix}\mu\cr t\end{bmatrix}
++\begin{bmatrix}2(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\cr -2v_p(\theta)(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T
+\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix}\end{align}$$
 
 *References*
  - Falanga, Davide, et al. "PAMPC: Perception-aware model predictive control for quadrotors." 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2018. https://doi.org/10.48550/arXiv.1804.04811
