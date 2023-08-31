@@ -63,13 +63,12 @@ class MpcWrapper
 
   MpcWrapper();
   MpcWrapper(
-    //MEMO: MPCC에서는 kStateSize+kInputSize != kRefSize이므로 R 사용 X.
     const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize>> Q,
-    const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kInputSize>> R);
+    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kStateSize>> R);
 
   bool setCosts(
     const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize>> Q,
-    const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kInputSize>> R,
+    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kStateSize>> R,
     const T state_cost_scaling = 0.0, const T input_cost_scaling = 0.0);
 
   bool setLimits(T min_thrust, T max_thrust,
@@ -124,17 +123,23 @@ class MpcWrapper
   Eigen::Map<Eigen::Matrix<float, kEndRefSize, kEndRefSize>>
     acado_W_end_{acadoVariables.WN};
 
+  // Linear term weighting vector
+  Eigen::Map<Eigen::Matrix<float, kStateSize, kSamples+1, Eigen::ColMajor>>
+    acado_Wlx_{acadoVariables.Wlx};
+  Eigen::Map<Eigen::Matrix<float, kInputSize, kSamples, Eigen::ColMajor>>
+    acado_Wlu_{acadoVariables.Wlu};
+
+// TODO: rpg_mpc에서는 T, w로 4개에 대해 constraints를 사용함. jt에 대해 추가되는 경우, dimension 수정 필요
   Eigen::Map<Eigen::Matrix<float, 4, kSamples, Eigen::ColMajor>>
     acado_lower_bounds_{acadoVariables.lbValues};
 
   Eigen::Map<Eigen::Matrix<float, 4, kSamples, Eigen::ColMajor>>
     acado_upper_bounds_{acadoVariables.ubValues};
+
 //TODO: cost weight를 ACADO Q에 맞게 임의로 상수로 부여함. 추후 수정 필요.
   Eigen::Matrix<T, kRefSize, kRefSize> W_ = (Eigen::Matrix<T, kRefSize, 1>() <<
     10 * Eigen::Matrix<T, 3, 1>::Ones(),
-    100 * Eigen::Matrix<T, 4, 1>::Ones(),
-    10 * Eigen::Matrix<T, 3, 1>::Ones(),
-    1 * Eigen::Matrix<T, 4, 1>::Ones()).finished().asDiagonal();
+    1 * Eigen::Matrix<T, 2, 1>::Ones()).finished().asDiagonal();
 
   Eigen::Matrix<T, kEndRefSize, kEndRefSize> WN_ =
     W_.block(0, 0, kEndRefSize, kEndRefSize);
@@ -142,7 +147,7 @@ class MpcWrapper
   bool acado_is_prepared_{false};
   const T dt_{0.1};
   const Eigen::Matrix<real_t, kInputSize, 1> kHoverInput_ =
-    (Eigen::Matrix<real_t, kInputSize, 1>() << 9.81, 0.0, 0.0, 0.0).finished();
+    (Eigen::Matrix<real_t, kInputSize, 1>() << 9.81, 0.0, 0.0, 0.0, 0.0).finished();
 };
 
 

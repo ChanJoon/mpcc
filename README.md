@@ -1,21 +1,32 @@
 # Model Predicive Contouring Control
 
-### Updates(23-08-26)
+### Updates
+- 23-08-31
+  - [quadrotor_model_thrustrates.cpp](model/quadrotor_model_thrustrates.cpp): $-\rho\cdot v_t$를 추가하고 이를 `mpc_wrapper`에 반영 (`acadoVariables.Wlx, Wlu`)
+  - [mpc_wrapper.h](include/mpcc/mpc_wrapper.h): `kHoverInput_`을 바뀐 모델에 맞게 초기화 ($t_0, v_{t0}, a_{t0}, \bar{J_{t0}} = 0$)
+  - [mpc_wrapper.cpp](src/mpc_wrapper.cpp): `
+    - `hover_state`, `acado_reference_states_`과 `acado_reference_end_states_`를 바뀐 모델에 맞게 초기화 (클래스 생성자 파트 참고)
+    - `setCosts`에서 linear weighting matrix `Wlx_`를 `R`로 할당하고 `R`을 `kStateSize`로 모두 수정. `Wlu_`는 사용 X. (i.e. $x^TQx+R^Tx$)
+    - `setTrajectory`에서 `states_`를 `kRefSize`만큼 `acado_reference_states_` 할당. `setReferencePose`는 `mpc_test.h`에서 사용하지 않으므로 일단 변경 X.
 
-- [quadrotor_model_thrustrates.cpp](model/quadrotor_model_thrustrates.cpp): CMPCC $x^TQx$ 부분 반영(아래 cost function 참조)
-- [mpc_wrapper](include/mpcc/mpc_wrapper.h):
-
-  - 기존 sh_mpc에서는 `kStateSize` 10, `kInputSize` 4, `kRefSize` 14, `kCostSize` 10 이었음.
-  - mpc에서는 `kRefSize` = `kStateSize` + `kInputSize` 이고, `kCostSize`는 hN 함수에 대한 cost weigt matrix dimension으로 사용됨. 현재 mpcc acado 모델에서는 `kRefSize`=5 < `kStateSize`=13 이므로 kCostSize를 제거하거나 맞게 변경함.
-  - mpc에서는 $x^TQx+u^TRx=state^TWstate$ 로 acado QP에 넣어주는데 mpcc에서는 R=0으로 사용하고 $x^TQx$만 사용하고자, `mpc_wrapper`에서 `Q`의 크기를 `kRefSize`로 변경함.
-- [mpc_test.h](include/mpcc/mpc_test.h): `mpc_wrapper`에 맞게 `Eigen::Matrix Q`를 선언
+- 23-08-26
+  - [quadrotor_model_thrustrates.cpp](model/quadrotor_model_thrustrates.cpp): CMPCC $x^TQx$ 부분 반영(아래 cost function 참조)
+  - [mpc_wrapper](include/mpcc/mpc_wrapper.h):
+    - sh_mpc에서는 `kRefSize` = `kStateSize` + `kInputSize` 이고, `kCostSize`는 hN 함수에 대한 cost weigt matrix dimension으로 사용됨. 현재 mpcc acado 모델에서는 `kRefSize`=5 < `kStateSize`=13 이므로 kCostSize를 제거하거나 맞게 변경함.
+    - mpc에서는 $x^TQx+u^TRx=state^TWstate$ 로 acado QP에 넣어주는데 mpcc에서는 $x^TQx$만 사용하고자, `mpc_wrapper`에서 `Q`의 크기를 `kRefSize`로 변경함.
+  - [mpc_test.h](include/mpcc/mpc_test.h): `mpc_wrapper`에 맞게 `Eigen::Matrix Q`를 선언
 
 ### TODO List
 
-  - [ ] : Update acado model to include $-\rho\cdot v_t$
-  - [ ] : Initialize `acado_reference_states_`, `acado_reference_end_states_`, `acado_W_` and `acado_W_end_` accordingly
-  - [ ] : Cost weight matrix should be assigned dynamically
+  - [x] : Update acado model to include $-\rho\cdot v_t$
+  - [ ] : How will `yaw` be applied?. (Searching other papers or reformulating $J$)
+  - [ ] : What is `acado_initializeNodesByForwardSimulation()`?
+  - [x] : Initialize `acado_reference_states_`, `acado_reference_end_states_` accordingly
+  - [x] : Initialize local variables `W_`, `WN_` in `mpc_wrapper.h` accordingly
+  - [x] : Add liear term weighting matrix `Wlx_`, `Wlu_` in `setCosts`
+  - [x] : `setReferencePose`, `setTrajectory`, `update`
   - [ ] : [mpc_test.h](include/mpcc/mpc_test.h)
+  - [ ] : Cost weight matrix `acado_W_` and `acado_W_end_` should be assigned dynamically in ~~`setCosts`~~, `set_params`
   - [ ] : Test roslaunch and parameter tuning
 
 ### Cost function 
@@ -27,6 +38,11 @@ $$\begin{align}J&=\sum_{k=1}^N\{(\mu^{(k)}-\mu_p(t^{(k)}))^2-\rho\cdot v_t^{(k)}
 \begin{bmatrix}\mu\cr t\end{bmatrix}
 +\begin{bmatrix}2(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\cr -2v_p(\theta)(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T
 \begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix}\end{align}$$
+$\text{with}\ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix}$
+
+**The states and inputs**
+$$\begin{gather}\textbf{x}=\begin{bmatrix}p_x, p_y, p_z, q_w, q_x, q_y, q_z, v_x, v_y, v_z, t, v_t, a_t\end{bmatrix}\\
+\textbf{u}=\begin{bmatrix}T, w_x, w_y, w_z, \bar{J_t}\end{bmatrix}\end{gather}$$
 
 *References*
  - Falanga, Davide, et al. "PAMPC: Perception-aware model predictive control for quadrotors." 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2018. https://doi.org/10.48550/arXiv.1804.04811

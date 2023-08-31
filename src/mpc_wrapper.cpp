@@ -42,6 +42,7 @@ MpcWrapper<T>::MpcWrapper()
   const Eigen::Matrix<T, kStateSize, 1> hover_state =
     (Eigen::Matrix<T, kStateSize, 1>() << 0.0, 0.0, 0.0,
                                           1.0, 0.0, 0.0, 0.0,
+                                          0.0, 0.0, 0.0,
                                           0.0, 0.0, 0.0).finished();
 
   // Initialize states x and xN and input u.
@@ -51,25 +52,14 @@ MpcWrapper<T>::MpcWrapper()
 
   acado_inputs_ = kHoverInput_.replicate(1, kSamples).template cast<float>();
 
-// TODO: reference_states (p t vt) 와 states (p q v t vt) 의 dimension이 다름.
-// hover_state에 p q v 이므로 이를 p t vt로 변경필요
   // Initialize references y and yN.
   acado_reference_states_.block(0, 0, kStateSize, kSamples) =
-    hover_state.replicate(1, kSamples).template cast<float>();
-  
-// kCostSize-kStateSize = 0 인데 왜 Zero로 초기화하는지?
-// DONE: kCostSize-kStateSize를 0으로 변경
-  acado_reference_states_.block(kStateSize, 0, 0, kSamples) =
-    Eigen::Matrix<float, 0, kSamples>::Zero();
+    // hover_state.replicate(1, kSamples).template cast<float>();
+    (Eigen::Matrix<kStateSize, 1>() << 0.0, 0.0, 0.0,
+                                        0.0, 0.0, 0.0).finished().replicate(1, kSamples).template cast<float>();
 
-  acado_reference_states_.block(kStateSize, 0, kInputSize, kSamples) =
-    kHoverInput_.replicate(1, kSamples);
-
-  acado_reference_end_state_.segment(0, kStateSize) =
-    hover_state.template cast<float>();
-
-  acado_reference_end_state_.segment(kStateSize, 0) =
-    Eigen::Matrix<float, 0, 1>::Zero();
+  acado_reference_end_state_.segment(0, kEndRefSize) =
+    Eigen::Matrix<float, 3, 1>::Zero();
 
   // Initialize Cost matrix W and WN.
   if(!(acado_W_.trace()>0.0))
@@ -88,7 +78,7 @@ MpcWrapper<T>::MpcWrapper()
 template <typename T>
 MpcWrapper<T>::MpcWrapper(
   const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize>> Q,
-  const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kInputSize>> R)
+  const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kStateSize>> R)
 {
   setCosts(Q, R);
   MpcWrapper();
@@ -98,7 +88,7 @@ MpcWrapper<T>::MpcWrapper(
 template <typename T>
 bool MpcWrapper<T>::setCosts(
   const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize>> Q,
-  const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kInputSize>> R,
+  const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kStateSize>> R,
   const T state_cost_scaling, const T input_cost_scaling)
 {
   if(state_cost_scaling < 0.0 || input_cost_scaling < 0.0 )
@@ -106,13 +96,12 @@ bool MpcWrapper<T>::setCosts(
     ROS_ERROR("MPC: Cost scaling is wrong, must be non-negative!");
     return false;
   }
-  // Set kRefSize*kRefSize size of Matrix W_ as diagonal matrix Q \\ R
-  // W_ = [Q ]
-  //      [ R]
   W_.block(0, 0, kRefSize, kRefSize) = Q;
-  W_.block(kStateSize, kStateSize, kInputSize, kInputSize) = R;
+// DONE: we don't use R
+  // W_.block(kStateSize, kStateSize, kInputSize, kInputSize) = R;
+  Wlx_.block(0, 0, kStateSize, kStateSize) = R;
 
-  WN_ = W_.block(0, 0, kRefSize, kRefSize);
+  WN_ = W_.block(0, 0, kEndRefSize, kEndRefSize);
 
   float state_scale{1.0};
   float input_scale{1.0};
@@ -123,16 +112,16 @@ bool MpcWrapper<T>::setCosts(
       * float(state_cost_scaling));
     input_scale = exp(- float(i)/float(kSamples)
       * float(input_cost_scaling));
-    acado_W_.block(0, i*kRefSize, kStateSize, kStateSize) =
-      W_.block(0, 0, kStateSize, kStateSize).template cast<float>()
+    acado_W_.block(0, i*kRefSize, kRefSize, kRefSize) =
+      W_.block(0, 0, kRefSize, kRefSize).template cast<float>()
       * state_scale;
-    acado_W_.block(kStateSize, i*kRefSize+kStateSize, kInputSize, kInputSize) =
-      W_.block(kStateSize, kStateSize, kInputSize, kInputSize
-        ).template cast<float>() * input_scale;
-    
-    acado_W_.block(kStateSize, i*kRefSize+kStateSize, kInputSize, kInputSize) =
-      W_.block(kStateSize, kStateSize, kInputSize, kInputSize
-        ).template cast<float>() * input_scale;
+  // DONE: we don't use inputs in the cost function(same as R)
+    // acado_W_.block(kStateSize, i*kRefSize+kStateSize, kInputSize, kInputSize) =
+      // W_.block(kStateSize, kStateSize, kInputSize, kInputSize
+        // ).template cast<float>() * input_scale;
+    acado_Wlx_.block(0, i*kStateSize, kStateSize, kStateSize) =
+      Wlx_.block(0, 0, kStateSize, kStateSize).template cast<float>();
+  // TODO: acado_Wlu_는 사용하지 않으므로 scaling에서 넣지 않음.
   } 
   acado_W_end_ = WN_.template cast<float>() * state_scale;
 
@@ -184,26 +173,24 @@ bool MpcWrapper<T>::setLimits(T min_thrust, T max_thrust,
   return true;
 }
 
-// DONE: kCostSize-kStateSize 를 0으로 변경, kCostSize를 kStateSize로 변경
 // Set a reference pose.
 template <typename T>
 bool MpcWrapper<T>::setReferencePose(
   const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state)
 {
-  acado_reference_states_.block(0, 0, kStateSize, kSamples) =
+  //TODO: this function is not used in mpc_test.h. If used, should be modified.
+  acado_reference_states_.block(0, 0, kRefSize, kSamples) =
     state.replicate(1, kSamples).template cast<float>();
 
-  acado_reference_states_.block(kStateSize, 0, 0, kSamples) =
-    Eigen::Matrix<float, 0, kSamples>::Zero();
+  // acado_reference_states_.block(kStateSize, 0, kInputSize, kSamples) =
+    // kHoverInput_.replicate(1, kSamples);
 
-  acado_reference_states_.block(kStateSize, 0, kInputSize, kSamples) =
-    kHoverInput_.replicate(1, kSamples);
+// DONE: We don't use acado_reference_end_state.
+  // acado_reference_end_state_.segment(0, kStateSize) =
+    // state.template cast<float>();
 
-  acado_reference_end_state_.segment(0, kStateSize) =
-    state.template cast<float>();
-
-  acado_reference_end_state_.segment(kStateSize, 0) =
-    Eigen::Matrix<float, 0, 1>::Zero();
+  // acado_reference_end_state_.segment(kStateSize, 0) =
+    // Eigen::Matrix<float, 0, 1>::Zero();
 
   acado_initializeNodesByForwardSimulation();
   return true;
@@ -218,19 +205,17 @@ bool MpcWrapper<T>::setTrajectory(
   Eigen::Map<Eigen::Matrix<float, kRefSize, kSamples, Eigen::ColMajor>>
     y(const_cast<float*>(acadoVariables.y));
 
-  acado_reference_states_.block(0, 0, kStateSize, kSamples) =
-    states.block(0, 0, kStateSize, kSamples).template cast<float>();
+  acado_reference_states_.block(0, 0, kRefSize, kSamples) =
+    states.block(0, 0, kRefSize, kSamples).template cast<float>();
 
-  acado_reference_states_.block(kStateSize, 0, 0, kSamples) =
-    Eigen::Matrix<float, 0, kSamples>::Zero();
+  // acado_reference_states_.block(kStateSize, 0, kInputSize, kSamples) =
+    // inputs.block(0, 0, kInputSize, kSamples).template cast<float>();
 
-  acado_reference_states_.block(kStateSize, 0, kInputSize, kSamples) =
-    inputs.block(0, 0, kInputSize, kSamples).template cast<float>();
-
-  acado_reference_end_state_.segment(0, kStateSize) =
-    states.col(kSamples).template cast<float>();
-  acado_reference_end_state_.segment(kStateSize, 0) =
-    Eigen::Matrix<float, 0, 1>::Zero();
+// DONE: We don't use acado_reference_end_state.
+  // acado_reference_end_state_.segment(0, kStateSize) =
+    // states.col(kSamples).template cast<float>();
+  // acado_reference_end_state_.segment(kStateSize, 0) =
+    // Eigen::Matrix<float, 0, 1>::Zero();
 
   // std::cout<<"acado_reference_states_:"<<acado_reference_states_<<std::endl;
 
