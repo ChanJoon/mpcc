@@ -55,7 +55,7 @@ MpcWrapper<T>::MpcWrapper()
   // Initialize references y and yN.
   acado_reference_states_.block(0, 0, kStateSize, kSamples) =
     // hover_state.replicate(1, kSamples).template cast<float>();
-    (Eigen::Matrix<kStateSize, 1>() << 0.0, 0.0, 0.0,
+    (Eigen::Matrix<float, kStateSize, 1>() << 0.0, 0.0, 0.0,
                                         0.0, 0.0, 0.0).finished().replicate(1, kSamples).template cast<float>();
 
   acado_reference_end_state_.segment(0, kEndRefSize) =

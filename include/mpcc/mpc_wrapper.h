@@ -124,9 +124,9 @@ class MpcWrapper
     acado_W_end_{acadoVariables.WN};
 
   // Linear term weighting vector
-  Eigen::Map<Eigen::Matrix<float, kStateSize, kSamples+1, Eigen::ColMajor>>
+  Eigen::Map<Eigen::Matrix<float, kStateSize*(kSamples+1), 1, Eigen::ColMajor>>
     acado_Wlx_{acadoVariables.Wlx};
-  Eigen::Map<Eigen::Matrix<float, kInputSize, kSamples, Eigen::ColMajor>>
+  Eigen::Map<Eigen::Matrix<float, kInputSize*kSamples, 1, Eigen::ColMajor>>
     acado_Wlu_{acadoVariables.Wlu};
 
 // TODO: rpg_mpc에서는 T, w로 4개에 대해 constraints를 사용함. jt에 대해 추가되는 경우, dimension 수정 필요
@@ -143,6 +143,13 @@ class MpcWrapper
 
   Eigen::Matrix<T, kEndRefSize, kEndRefSize> WN_ =
     W_.block(0, 0, kEndRefSize, kEndRefSize);
+
+// TODO: Wlx_ 초기화
+  Eigen::Matrix<T, kStateSize, 1> Wlx_ =
+    (Eigen::Matrix<T, kStateSize, 1>() << 0.0, 0.0, 0.0,
+                                          0.0, 0.0, 0.0, 0.0,
+                                          0.0, 0.0, 0.0,
+                                          0.0, 0.0, 0.0).finished();
 
   bool acado_is_prepared_{false};
   const T dt_{0.1};

@@ -117,7 +117,7 @@ class LSH_MPC{
 		Matrix<double, kStateSize, kSamples + 1> predicted_states_;
 		Matrix<double, kInputSize, kSamples> predicted_inputs_;
 		Matrix<double, kRefSize, kRefSize> Q_;
-		Matrix<double, kInputSize, kInputSize> R_;
+		Matrix<double, kStateSize, kStateSize> R_;
 
 		double max_bodyrate_xy_, max_bodyrate_z_, max_throttle_, min_throttle_, Q_pos_xy_, Q_pos_z_, Q_attitude_, Q_velocity_, R_thrust_, R_pitchroll_, R_yaw_, state_cost_exponential_, input_cost_exponential_;
 		
@@ -439,7 +439,7 @@ bool LSH_MPC::set_params() {
       // Q_velocity_, Q_velocity_, Q_velocity_
 			).finished().asDiagonal();
 
-	R_ = (Matrix<double, kInputSize, 1>() << 
+	R_ = (Matrix<double, kStateSize, 1>() << 
       R_thrust_, R_pitchroll_, R_pitchroll_, R_yaw_).finished().asDiagonal();
 
 	mpc_wrapper_.setCosts(Q_, R_, state_cost_exponential_, input_cost_exponential_);
