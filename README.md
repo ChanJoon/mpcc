@@ -3,7 +3,7 @@
 ### Updates
 - 23-09-07(minor)
   - 전역경로와 관련된 부분은 dummy로 처리하고 나머지 부분부터 작성 후 빌드 완료
-  - `acado_Wlx`가 $273*1$의 column vector, `mpc_wrapper`의 `Wlx_`는 $13*1$의 column vector이므로 `<const Eigen::Matrix<T, kStateSize, kStateSize> R` and `R_`를 Matrix에서 Vector로 수정.(`kStateSize x (kSamples+1) = 273`)
+  - `acado_Wlx`가 $`273*1`$의 column vector, `mpc_wrapper`의 `Wlx_`는 $13*1$의 column vector이므로 `<const Eigen::Matrix<T, kStateSize, kStateSize> R` and `R_`를 Matrix에서 Vector로 수정.(`kStateSize x (kSamples+1) = 273`)
   - CMPCC를 참고하여 `set_state_est`, `set_params`와 `solve_mpc` 수정. 아래 **TODO**에 적힌 대로 이전 결과로부터 `vt`, `at`를 업데이트 해주고, 전역경로를 callback에서 처리해야함.(CMPCC에서는 전체 전역경로 정보를 yaml으로 읽어옴)
 - 23-08-31
   - [quadrotor_model_thrustrates.cpp](model/quadrotor_model_thrustrates.cpp): $-\rho\cdot v_t$를 추가하고 이를 `mpc_wrapper`에 반영 (`acadoVariables.Wlx, Wlu`)
@@ -43,9 +43,11 @@ $$\begin{align}J&=\sum_{k=1}^N\{(\mu^{(k)}-\mu_p(t^{(k)}))^2-\rho\cdot v_t^{(k)}
 \begin{bmatrix}\mu\cr t\end{bmatrix}
 +\begin{bmatrix}2(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\cr -2v_p(\theta)(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T
 \begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix}\end{align}$$
-$\text{with}\ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix}$
+
+$`\text{with}\ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix}`$
 
 **The states and inputs**
+
 $$\begin{gather}\textbf{x}=\begin{bmatrix}p_x, p_y, p_z, q_w, q_x, q_y, q_z, v_x, v_y, v_z, t, v_t, a_t\end{bmatrix}\\
 \textbf{u}=\begin{bmatrix}T, w_x, w_y, w_z, \bar{J_t}\end{bmatrix}\end{gather}$$
 
