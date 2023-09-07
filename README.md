@@ -1,10 +1,24 @@
 # Model Predicive Contouring Control
 
 ### Updates
-- 23-09-07(minor)
-  - 전역경로와 관련된 부분은 dummy로 처리하고 나머지 부분부터 작성 후 빌드 완료
-  - `acado_Wlx`가 $`273*1`$의 column vector, `mpc_wrapper`의 `Wlx_`는 $13*1$의 column vector이므로 `<const Eigen::Matrix<T, kStateSize, kStateSize> R` and `R_`를 Matrix에서 Vector로 수정.(`kStateSize x (kSamples+1) = 273`)
-  - CMPCC를 참고하여 `set_state_est`, `set_params`와 `solve_mpc` 수정. 아래 **TODO**에 적힌 대로 이전 결과로부터 `vt`, `at`를 업데이트 해주고, 전역경로를 callback에서 처리해야함.(CMPCC에서는 전체 전역경로 정보를 yaml으로 읽어옴)
+- 23-09-07
+  - `acado_Wlx`가 $`273*1`$의 column vector, `mpc_wrapper`의 `Wlx_`는 $13*1$의 column vector이므로 `Eigen::Matrix<T, kStateSize, kStateSize> R` 과 `R_`을 Matrix에서 Vector로 수정.(`kStateSize x (kSamples+1) = 273`)
+  - CMPCC를 참고하여 `set_state_est`, `set_params`와 `solve_mpc` 수정.
+  - `est_state_`의 `vt`, `at`를 이전 결과로부터 가져오도록 수정. 우선, `solve_from_scratch_` 조건문에 update되는 부분을 넣음. 추후 필요시 리팩토링
+    ```cpp
+      // SOLVE MPC
+    if (solve_from_scratch_) {
+      ROS_INFO("Solving MPC with hover as initial guess.");
+      mpc_wrapper_.solve(est_state_);
+      solve_from_scratch_ = false;
+    } else {
+      est_state_(STATE::kVelT) = predicted_states_(STATE::kVelT, 1);
+      est_state_(STATE::kAccT) = predicted_states_(STATE::kAccT, 1);
+      mpc_wrapper_.update(est_state_, do_preparation_step);
+    }
+    ```
+  - `est_state`에서 `t`에 해당하는 부분을 odom의 `timestamp`로 함. `reference_states_`의 `t`를 `target_traj`의 `timestamp`로 하여 같은 타임라인 간의 차이로 생각하여 이렇게 하였으나 추후 문제 시 수정해야함.
+  - `mpc_wrapper`에서 잘못된 부분들 일부 수정.(자세한 내용은 commit 내용 확인)
 - 23-08-31
   - [quadrotor_model_thrustrates.cpp](model/quadrotor_model_thrustrates.cpp): $-\rho\cdot v_t$를 추가하고 이를 `mpc_wrapper`에 반영 (`acadoVariables.Wlx, Wlu`)
   - [mpc_wrapper.h](include/mpcc/mpc_wrapper.h): `kHoverInput_`을 바뀐 모델에 맞게 초기화 ($t_0, v_{t0}, a_{t0}, \bar{J_{t0}} = 0$)
@@ -30,8 +44,9 @@
   - [x] : Add liear term weighting matrix `Wlx_`, `Wlu_` in `setCosts`
   - [x] : `setReferencePose`, `setTrajectory`, `update`
   - [x] : Cost weight matrix `acado_W_` and `acado_W_end_` should be assigned dynamically in ~~`setCosts`~~, `set_params`
-  - [ ] : Modify `est_state_`, `reference_states_` with reference to CMPCC(*Update some states from last horizon*)
-  - [ ] : Implement `findNearestTheta` and `getGlobalCommand`
+  - [x] : Modify `est_state_`, `reference_states_` with reference to CMPCC(*Update some states from last horizon*)
+  - [ ] : ~~Implement `findNearestTheta` and `getGlobalCommand`~~ (Currently using target topics)
+  - [ ] : Fix `NaN` values from `predicted_states_(STATE::kVelT, 1)` and `(State::kAccT)`
   - [ ] : Test roslaunch and parameter tuning
 
 ### Cost function 

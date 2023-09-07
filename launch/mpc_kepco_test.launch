@@ -43,11 +43,11 @@
   <param name="/K_adaacc" value="1.0"/>
 
   <!-- false: baseline // true: baseline+L1 -->
-  <param name="/L1_on" value="true"/>
+  <param name="/L1_on" value="false"/>
 
   <param name="/debug" value="true"/>  
   
-  <node pkg="sh_mpc" type="mpc_test_node" name="mpc_test_node" output="screen" />
-  <!-- <node pkg="sh_mpc" type="mpc_test_node" name="mpc_test_node" output="screen" launch-prefix="gdb -ex run -args"/> -->
+  <!--node pkg="mpcc" type="mpc_test_node" name="mpc_test_node" output="screen" /-->
+  <node pkg="mpcc" type="mpc_test_node" name="mpc_test_node" output="screen" launch-prefix="gdb -ex run -args"/>
     
 </launch>

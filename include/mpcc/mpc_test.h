@@ -79,7 +79,7 @@ class MPCC{
 		double ctrl_hz, m_cutoff_hz, um_cutoff_hz;
 		double thrust_const, thrust_offset, max_thrust, min_thrust, K_adaacc;
 		double As_1,	As_2, As_3, As_4, As_5, As_6;
-		double rho;
+		double theta_max, rho;
 
 		bool state_check = false, target_check = false, L1_start = false;
 		bool ctrl_init = false, L1_on = false, debug = false;
@@ -232,7 +232,7 @@ void MPCC::state_cb(const mavros_msgs::State::ConstPtr& msg){
 
 void MPCC::odom_cb(const nav_msgs::Odometry::ConstPtr& msg){
 	dt_odom = (msg->header.stamp - t_odom).toSec();
-	// t_odom에서 pos, att, vel이 들어간다
+	// pos, att, vel이 들어간 시점 t_odom
 	t_odom = msg->header.stamp;
 	pos << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
 	att << msg->pose.pose.orientation.w, msg->pose.pose.orientation.x, 
@@ -280,6 +280,7 @@ void MPCC::target_cb(const nav_msgs::Odometry::ConstPtr& msg){
 
 void MPCC::target_traj_cb(const nav_msgs::Path::ConstPtr& msg){
 	target_traj = *msg;
+	theta_max = target_traj.poses[0].header.stamp.toSec();
 }
 
 void MPCC::control_timer_func(const ros::TimerEvent& event){
@@ -303,7 +304,10 @@ void MPCC::control_timer_func(const ros::TimerEvent& event){
 				ROS_WARN("Offboarding...");
 				
 				ctrl_start_time = ros::Time::now();
-				est_state_ << 0, 0, 0, 1, 0, 0, 0, 0, 0, 0;
+				est_state_ << 0, 0, 0, 
+											1, 0, 0, 0,
+											0, 0, 0,
+											0, 0, 0;
 				return;
 			}
 			else{
@@ -404,6 +408,7 @@ void MPCC::solve_mpc(){
 		reference_inputs_(2, i) = 0;			// w_y
 		reference_inputs_(3, i) = 0;			// w_z
 		reference_inputs_(4, i) = 0;			// jt
+		theta_max += target_traj.poses[i].header.stamp.toSec();
 	}
 	// Get the feedback from MPC.
 	mpc_wrapper_.setTrajectory(reference_states_, reference_inputs_);
@@ -416,6 +421,11 @@ void MPCC::solve_mpc(){
 		mpc_wrapper_.solve(est_state_);
 		solve_from_scratch_ = false;
 	} else {
+		// TODO: Refactoring
+		est_state_(STATE::kVelT) = predicted_states_(STATE::kVelT, 1);
+		est_state_(STATE::kAccT) = predicted_states_(STATE::kAccT, 1);
+		// TODO: vt and at shows NaN
+		ROS_INFO("vt: %f, at: %f", est_state_(STATE::kVelT), est_state_(STATE::kAccT));
 		mpc_wrapper_.update(est_state_, do_preparation_step);
 	}
 	mpc_wrapper_.getStates(predicted_states_);
@@ -467,7 +477,7 @@ bool MPCC::set_params() {
 		theta = est_state_(STATE::kTime);
 	}
 	// TODO: getGlobalCommand(theta, pos, vel);
-	// 우선 pos(theta), vel(theta) 대신 직관적인 변수로 대체
+	// 우선 pos(theta), vel(theta) 대신 target_odom callback에서 받은 변수로 대체
 	// CMPCC에서는 최대 global_traj_time과 theta를 std::fmod로 [0, max_theta)로 mapping
 	// 그 후 global_traj로 theta에 해당하는 pos, vel을 얻어냄.
 	double x_v = t_pos(0);
@@ -527,8 +537,9 @@ bool MPCC::set_state_est() {
 	est_state_(STATE::kVelY) = vel(1);
 	est_state_(STATE::kVelZ) = vel(2);
 	//TODO: Implement a function finding nearest theta based on CMPCC
-	est_state_(STATE::kTime) = findNearestTheta(t_pos);
-	// TODO: At first, vt, at are zero. After solved, vt, at are brought from result of prediction.
+	// est_state_(STATE::kTime) = findNearestTheta(t_pos);
+	est_state_(STATE::kTime) = t_odom.toSec();
+	// DONE: At first, vt, at are zero. After solved, vt, at are brought from result of prediction.
 	est_state_(STATE::kVelT) = 0;
 	est_state_(STATE::kAccT) = 0;
 	return true;

@@ -53,13 +53,13 @@ MpcWrapper<T>::MpcWrapper()
   acado_inputs_ = kHoverInput_.replicate(1, kSamples).template cast<float>();
 
   // Initialize references y and yN.
-  acado_reference_states_.block(0, 0, kStateSize, kSamples) =
+  acado_reference_states_.block(0, 0, kRefSize, kSamples) =
     // hover_state.replicate(1, kSamples).template cast<float>();
-    (Eigen::Matrix<float, kStateSize, 1>() << 0.0, 0.0, 0.0,
-                                        0.0, 0.0, 0.0).finished().replicate(1, kSamples).template cast<float>();
+    Eigen::Matrix<float, kRefSize, kSamples>::Zero();
+  reference_states_.setZero();
 
   acado_reference_end_state_.segment(0, kEndRefSize) =
-    Eigen::Matrix<float, 3, 1>::Zero();
+    Eigen::Matrix<float, kEndRefSize, 1>::Zero();
 
   // Initialize Cost matrix W and WN.
   if(!(acado_W_.trace()>0.0))
@@ -119,10 +119,11 @@ bool MpcWrapper<T>::setCosts(
       // W_.block(kStateSize, kStateSize, kInputSize, kInputSize
         // ).template cast<float>() * input_scale;
 
-    acado_Wlx_.block(0, i * kStateSize, kStateSize, 1) =
+    acado_Wlx_.block(i * kStateSize, 0, kStateSize, 1) =
       Wlx_.template cast<float>() * input_scale;
   //MEMO: acado_Wlu_는 사용하지 않으므로 scaling에서 넣지 않음.
   } 
+  acado_Wlx_.block(kSamples * kStateSize, 0, kStateSize, 1) = Wlx_.template cast<float>() * input_scale;
   acado_W_end_ = WN_.template cast<float>() * state_scale;
 
   return true;
@@ -178,9 +179,9 @@ template <typename T>
 bool MpcWrapper<T>::setReferencePose(
   const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state)
 {
-  //TODO: this function is not used in mpc_test.h. If used, should be modified.
+// DONE: this function is not used in mpc_test.h. If used, should be modified.
   acado_reference_states_.block(0, 0, kRefSize, kSamples) =
-    state.replicate(1, kSamples).template cast<float>();
+    state.block(0, 0, kRefSize, 1).replicate(1, kSamples).template cast<float>();
 
   // acado_reference_states_.block(kStateSize, 0, kInputSize, kSamples) =
     // kHoverInput_.replicate(1, kSamples);
@@ -204,9 +205,18 @@ bool MpcWrapper<T>::setTrajectory(
 {
   Eigen::Map<Eigen::Matrix<float, kRefSize, kSamples, Eigen::ColMajor>>
     y(const_cast<float*>(acadoVariables.y));
+// DONE: Fix this. The order of states are different.
+  Eigen::Matrix<T, kRefSize, kSamples> states_;
+  states_.row(0) = states.block(0, 0, 1, kSamples);
+  states_.row(1) = states.block(1, 0, 1, kSamples);
+  states_.row(2) = states.block(2, 0, 1, kSamples);
+  states_.row(3) = states.block(10, 0, 1, kSamples);
+  states_.row(4) = states.block(11, 0, 1, kSamples);
 
-  acado_reference_states_.block(0, 0, kRefSize, kSamples) =
-    states.block(0, 0, kRefSize, kSamples).template cast<float>();
+  acado_reference_states_ = states_.template cast<float>();
+  // Store reference_states_ to use quaternion
+  reference_states_.block(0, 0, kStateSize, kSamples) = 
+    states.block(0, 0, kStateSize, kSamples).template cast<float>();
 
   // acado_reference_states_.block(kStateSize, 0, kInputSize, kSamples) =
     // inputs.block(0, 0, kInputSize, kSamples).template cast<float>();
@@ -261,7 +271,8 @@ bool MpcWrapper<T>::update(
   // Check if estimated and reference quaternion live in sthe same hemisphere.
   acado_initial_state_ = state.template cast<float>();
   if(acado_initial_state_.segment(3,4).dot(
-    Eigen::Vector4f(acado_reference_states_.block(3,0,4,1)))<(T)0.0)
+    // Eigen::Vector4f(acado_reference_states_.block(3,0,4,1)))<(T)0.0)
+    Eigen::Vector4f(reference_states_.block(3,0,4,1)))<(T)0.0)
   {
     acado_initial_state_.segment(3,4) = -acado_initial_state_.segment(3,4);
   }

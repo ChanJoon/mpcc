@@ -101,6 +101,7 @@ class MpcWrapper
  private:
   Eigen::Map<Eigen::Matrix<float, kRefSize, kSamples, Eigen::ColMajor>>
     acado_reference_states_{acadoVariables.y};
+  Eigen::Matrix<float, kStateSize, kSamples> reference_states_;
 
   Eigen::Map<Eigen::Matrix<float, kEndRefSize, 1, Eigen::ColMajor>>
     acado_reference_end_state_{acadoVariables.yN};
@@ -144,7 +145,7 @@ class MpcWrapper
   Eigen::Matrix<T, kEndRefSize, kEndRefSize> WN_ =
     W_.block(0, 0, kEndRefSize, kEndRefSize);
 
-// TODO: Wlx_ 초기화
+// DONE: Wlx_ 초기화
   Eigen::Matrix<T, kStateSize, 1> Wlx_ =
     (Eigen::Matrix<T, kStateSize, 1>() << 0.0, 0.0, 0.0,
                                           0.0, 0.0, 0.0, 0.0,
