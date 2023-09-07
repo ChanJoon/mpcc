@@ -64,11 +64,11 @@ class MpcWrapper
   MpcWrapper();
   MpcWrapper(
     const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize>> Q,
-    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kStateSize>> R);
+    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> R);
 
   bool setCosts(
     const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize>> Q,
-    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kStateSize>> R,
+    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> R,
     const T state_cost_scaling = 0.0, const T input_cost_scaling = 0.0);
 
   bool setLimits(T min_thrust, T max_thrust,

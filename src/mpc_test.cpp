@@ -12,7 +12,7 @@ int main(int argc, char **argv){
 
   ros::init(argc, argv, "mpc_node");
   ros::NodeHandle n("~");
-  LSH_MPC LSH_MPC(n);    
+  MPCC MPCC(n);    
   ros::AsyncSpinner spinner(5); // Use 5 threads -> 5 callbacks
   spinner.start();
   ros::waitForShutdown();

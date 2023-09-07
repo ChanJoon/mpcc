@@ -1,6 +1,10 @@
 # Model Predicive Contouring Control
 
 ### Updates
+- 23-09-07(minor)
+  - 전역경로와 관련된 부분은 dummy로 처리하고 나머지 부분부터 작성 후 빌드 완료
+  - `acado_Wlx`가 $273*1$의 column vector, `mpc_wrapper`의 `Wlx_`는 $13*1$의 column vector이므로 `<const Eigen::Matrix<T, kStateSize, kStateSize> R` and `R_`를 Matrix에서 Vector로 수정.(`kStateSize x (kSamples+1) = 273`)
+  - CMPCC를 참고하여 `set_state_est`, `set_params`와 `solve_mpc` 수정. 아래 **TODO**에 적힌 대로 이전 결과로부터 `vt`, `at`를 업데이트 해주고, 전역경로를 callback에서 처리해야함.(CMPCC에서는 전체 전역경로 정보를 yaml으로 읽어옴)
 - 23-08-31
   - [quadrotor_model_thrustrates.cpp](model/quadrotor_model_thrustrates.cpp): $-\rho\cdot v_t$를 추가하고 이를 `mpc_wrapper`에 반영 (`acadoVariables.Wlx, Wlu`)
   - [mpc_wrapper.h](include/mpcc/mpc_wrapper.h): `kHoverInput_`을 바뀐 모델에 맞게 초기화 ($t_0, v_{t0}, a_{t0}, \bar{J_{t0}} = 0$)
@@ -25,8 +29,9 @@
   - [x] : Initialize local variables `W_`, `WN_` in `mpc_wrapper.h` accordingly
   - [x] : Add liear term weighting matrix `Wlx_`, `Wlu_` in `setCosts`
   - [x] : `setReferencePose`, `setTrajectory`, `update`
-  - [ ] : [mpc_test.h](include/mpcc/mpc_test.h)
-  - [ ] : Cost weight matrix `acado_W_` and `acado_W_end_` should be assigned dynamically in ~~`setCosts`~~, `set_params`
+  - [x] : Cost weight matrix `acado_W_` and `acado_W_end_` should be assigned dynamically in ~~`setCosts`~~, `set_params`
+  - [ ] : Modify `est_state_`, `reference_states_` with reference to CMPCC(*Update some states from last horizon*)
+  - [ ] : Implement `findNearestTheta` and `getGlobalCommand`
   - [ ] : Test roslaunch and parameter tuning
 
 ### Cost function 

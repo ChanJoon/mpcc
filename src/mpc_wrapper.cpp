@@ -78,7 +78,7 @@ MpcWrapper<T>::MpcWrapper()
 template <typename T>
 MpcWrapper<T>::MpcWrapper(
   const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize>> Q,
-  const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kStateSize>> R)
+  const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> R)
 {
   setCosts(Q, R);
   MpcWrapper();
@@ -88,7 +88,7 @@ MpcWrapper<T>::MpcWrapper(
 template <typename T>
 bool MpcWrapper<T>::setCosts(
   const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize>> Q,
-  const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kStateSize>> R,
+  const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> R,
   const T state_cost_scaling, const T input_cost_scaling)
 {
   if(state_cost_scaling < 0.0 || input_cost_scaling < 0.0 )
@@ -97,9 +97,9 @@ bool MpcWrapper<T>::setCosts(
     return false;
   }
   W_.block(0, 0, kRefSize, kRefSize) = Q;
-// DONE: we don't use R
   // W_.block(kStateSize, kStateSize, kInputSize, kInputSize) = R;
-  Wlx_.block(0, 0, kStateSize, kStateSize) = R;
+
+  Wlx_.block(0, 0, kStateSize, 1) = R;
 
   WN_ = W_.block(0, 0, kEndRefSize, kEndRefSize);
 
@@ -112,16 +112,16 @@ bool MpcWrapper<T>::setCosts(
       * float(state_cost_scaling));
     input_scale = exp(- float(i)/float(kSamples)
       * float(input_cost_scaling));
-    acado_W_.block(0, i*kRefSize, kRefSize, kRefSize) =
+    acado_W_.block(0, i * kRefSize, kRefSize, kRefSize) =
       W_.block(0, 0, kRefSize, kRefSize).template cast<float>()
       * state_scale;
-  // DONE: we don't use inputs in the cost function(same as R)
     // acado_W_.block(kStateSize, i*kRefSize+kStateSize, kInputSize, kInputSize) =
       // W_.block(kStateSize, kStateSize, kInputSize, kInputSize
         // ).template cast<float>() * input_scale;
-    acado_Wlx_.block(0, i*kStateSize, kStateSize, kStateSize) =
-      Wlx_.block(0, 0, kStateSize, kStateSize).template cast<float>();
-  // TODO: acado_Wlu_는 사용하지 않으므로 scaling에서 넣지 않음.
+
+    acado_Wlx_.block(0, i * kStateSize, kStateSize, 1) =
+      Wlx_.template cast<float>() * input_scale;
+  //MEMO: acado_Wlu_는 사용하지 않으므로 scaling에서 넣지 않음.
   } 
   acado_W_end_ = WN_.template cast<float>() * state_scale;
 
