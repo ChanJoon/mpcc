@@ -47,7 +47,7 @@
 
   <param name="/debug" value="true"/>  
   
-  <!--node pkg="mpcc" type="mpc_test_node" name="mpc_test_node" output="screen" /-->
-  <node pkg="mpcc" type="mpc_test_node" name="mpc_test_node" output="screen" launch-prefix="gdb -ex run -args"/>
+  <node pkg="mpcc" type="mpc_test_node" name="mpc_test_node" output="screen" />
+  <!-- <node pkg="mpcc" type="mpc_test_node" name="mpc_test_node" output="screen" launch-prefix="gdb -ex run -args"/> -->
     
 </launch>

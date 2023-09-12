@@ -1,6 +1,11 @@
 # Model Predicive Contouring Control
 
 ### Updates
+- 23-09-12
+  - 기존 Cost function을 quadratic form 에서 $l_2$-norm으로 바꿔줌. OSQP에서는 Reference에 해당하는 부분을 $x^TQx+q^Tx$의 $Q, q$에 넣어주었지만, ACADO에서는 별도로 reference state가 주어진다. 따라서 *acadoVariables.y*에는 0을 넣어주고 weight matrix를 그대로 사용하고자 함.
+  - Gazebo 테스트 중 비정상적으로 비행하여서, 출력문을 통해 디버깅 중.
+  - acado_inputs에 값이 정상적으로 변하지 않아 acado_feedbackStep() returnValue로 원인 파악 중.
+  - *acadoVariables.y*를 기존 MPC처럼 state+input으로 변경해주어야 할 것으로 보임.
 - 23-09-07
   - `acado_Wlx`가 $`273*1`$의 column vector, `mpc_wrapper`의 `Wlx_`는 $13*1$의 column vector이므로 `Eigen::Matrix<T, kStateSize, kStateSize> R` 과 `R_`을 Matrix에서 Vector로 수정.(`kStateSize x (kSamples+1) = 273`)
   - CMPCC를 참고하여 `set_state_est`, `set_params`와 `solve_mpc` 수정.
@@ -38,7 +43,7 @@
 
   - [x] : Update acado model to include $-\rho\cdot v_t$
   - [ ] : How will `yaw` be applied?. (Searching other papers or reformulating $J$)
-  - [ ] : What is `acado_initializeNodesByForwardSimulation()`?
+  - [x] : What is `acado_initializeNodesByForwardSimulation()`?
   - [x] : Initialize `acado_reference_states_`, `acado_reference_end_states_` accordingly
   - [x] : Initialize local variables `W_`, `WN_` in `mpc_wrapper.h` accordingly
   - [x] : Add liear term weighting matrix `Wlx_`, `Wlu_` in `setCosts`
@@ -46,7 +51,7 @@
   - [x] : Cost weight matrix `acado_W_` and `acado_W_end_` should be assigned dynamically in ~~`setCosts`~~, `set_params`
   - [x] : Modify `est_state_`, `reference_states_` with reference to CMPCC(*Update some states from last horizon*)
   - [ ] : ~~Implement `findNearestTheta` and `getGlobalCommand`~~ (Currently using target topics)
-  - [ ] : Fix `NaN` values from `predicted_states_(STATE::kVelT, 1)` and `(State::kAccT)`
+  - [x] : Fix `NaN` values from `predicted_states_(STATE::kVelT, 1)` and `(State::kAccT)`
   - [ ] : Test roslaunch and parameter tuning
 
 ### Cost function 
@@ -59,7 +64,13 @@ $$\begin{align}J&=\sum_{k=1}^N\{(\mu^{(k)}-\mu_p(t^{(k)}))^2-\rho\cdot v_t^{(k)}
 +\begin{bmatrix}2(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\cr -2v_p(\theta)(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T
 \begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix}\end{align}$$
 
-$`\text{with}\ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix}`$
+---
+*Convert quadratic form(OSQP) to a weighted l2-norm(ACADO)*
+
+$$\begin{align}&=\sum_{k=1}^N\|W^{1/2}\begin{bmatrix}\mu\\t\\v_t\end{bmatrix}\|^2+q^T
+\begin{bmatrix}\mu\\t\\v_t\end{bmatrix}\\
+&=\sum_{k=1}^N\| \begin{bmatrix}\mu\\t\\v_t\end{bmatrix} \|^2_W+q^T\begin{bmatrix}\mu\\t\\v_t\end{bmatrix} \\
+s.t & \ \ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix} W=\begin{bmatrix}1 & -v_p(\theta)\\-v_p(\theta)&v_p^2(\theta)\end{bmatrix},\ q=\begin{bmatrix}2(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\\-2v_p(\theta)(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\\-\rho\end{bmatrix}^T\end{align}$$
 
 **The states and inputs**
 

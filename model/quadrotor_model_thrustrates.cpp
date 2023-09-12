@@ -65,6 +65,7 @@ int main( ){
   const double T_max = 20;        // Maximal thrust [N]
   const double a_max = 20;
   const double at_max = 3;
+  const double jerk_max = 15;     // Maximal jerk (m/s^3) (refer to CMPCC)
 
   // Bias to prevent division by zero.
   const double epsilon = 0.1;     // Camera projection recover bias [m]
@@ -122,6 +123,7 @@ int main( ){
   ocp.subjectTo(-w_max_xy <= w_y <= w_max_xy);
   ocp.subjectTo(-w_max_yaw <= w_z <= w_max_yaw);
   ocp.subjectTo( T_min <= T <= T_max);
+  ocp.subjectTo(-jerk_max <= jt <= jerk_max);
 
   ocp.setNOD(10);
 
@@ -137,6 +139,7 @@ int main( ){
   mpc.set(NUM_INTEGRATOR_STEPS,   N);
   mpc.set(QP_SOLVER,              QP_QPOASES);          // free, source code
   mpc.set(HOTSTART_QP,            YES);
+  mpc.set(PRINTLEVEL,             DEBUG);
   mpc.set(CG_USE_OPENMP,                    YES);       // paralellization
   mpc.set(CG_HARDCODE_CONSTRAINT_VALUES,    NO);        // set on runtime
   mpc.set(CG_USE_VARIABLE_WEIGHTING_MATRIX, YES);       // time-varying costs

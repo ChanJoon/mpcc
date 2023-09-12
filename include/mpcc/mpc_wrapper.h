@@ -72,7 +72,7 @@ class MpcWrapper
     const T state_cost_scaling = 0.0, const T input_cost_scaling = 0.0);
 
   bool setLimits(T min_thrust, T max_thrust,
-    T max_rollpitchrate, T max_yawrate);
+    T max_rollpitchrate, T max_yawrate, T max_jerk);
 
   bool setReferencePose(
     const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> state);
@@ -97,6 +97,7 @@ class MpcWrapper
   void getInputs(
     Eigen::Ref<Eigen::Matrix<T, kInputSize, kSamples>> return_input);
   T getTimestep() { return dt_; }
+  void getVerbose();
 
  private:
   Eigen::Map<Eigen::Matrix<float, kRefSize, kSamples, Eigen::ColMajor>>
@@ -131,10 +132,10 @@ class MpcWrapper
     acado_Wlu_{acadoVariables.Wlu};
 
 // TODO: rpg_mpc에서는 T, w로 4개에 대해 constraints를 사용함. jt에 대해 추가되는 경우, dimension 수정 필요
-  Eigen::Map<Eigen::Matrix<float, 4, kSamples, Eigen::ColMajor>>
+  Eigen::Map<Eigen::Matrix<float, 5, kSamples, Eigen::ColMajor>>
     acado_lower_bounds_{acadoVariables.lbValues};
 
-  Eigen::Map<Eigen::Matrix<float, 4, kSamples, Eigen::ColMajor>>
+  Eigen::Map<Eigen::Matrix<float, 5, kSamples, Eigen::ColMajor>>
     acado_upper_bounds_{acadoVariables.ubValues};
 
 //TODO: cost weight를 ACADO Q에 맞게 임의로 상수로 부여함. 추후 수정 필요.
@@ -156,6 +157,7 @@ class MpcWrapper
   const T dt_{0.1};
   const Eigen::Matrix<real_t, kInputSize, 1> kHoverInput_ =
     (Eigen::Matrix<real_t, kInputSize, 1>() << 9.81, 0.0, 0.0, 0.0, 0.0).finished();
+  int preparation_status;
 };
 
 

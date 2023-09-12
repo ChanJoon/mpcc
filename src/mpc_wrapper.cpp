@@ -70,7 +70,7 @@ MpcWrapper<T>::MpcWrapper()
 
   // Initialize solver.
   acado_initializeNodesByForwardSimulation();
-  acado_preparationStep();
+  preparation_status = acado_preparationStep();
   acado_is_prepared_ = true;
 }
 
@@ -126,13 +126,16 @@ bool MpcWrapper<T>::setCosts(
   acado_Wlx_.block(kSamples * kStateSize, 0, kStateSize, 1) = Wlx_.template cast<float>() * input_scale;
   acado_W_end_ = WN_.template cast<float>() * state_scale;
 
+  // std::cout << "acado_W_" << acado_W_ << std::endl;
+  // std::cout << "acado_Wlx_" << acado_Wlx_ << std::endl;
+
   return true;
 }
 
 // Set the input limits.
 template <typename T>
 bool MpcWrapper<T>::setLimits(T min_thrust, T max_thrust,
-    T max_rollpitchrate, T max_yawrate)
+    T max_rollpitchrate, T max_yawrate, T max_jerk)
 {
   if(min_thrust <= 0.0 || min_thrust > max_thrust)
   {
@@ -159,12 +162,12 @@ bool MpcWrapper<T>::setLimits(T min_thrust, T max_thrust,
   }
 
   // Set input boundaries.
-  Eigen::Matrix<T, 4, 1> lower_bounds = Eigen::Matrix<T, 4, 1>::Zero();
-  Eigen::Matrix<T, 4, 1> upper_bounds = Eigen::Matrix<T, 4, 1>::Zero();
+  Eigen::Matrix<T, 5, 1> lower_bounds = Eigen::Matrix<T, 5, 1>::Zero();
+  Eigen::Matrix<T, 5, 1> upper_bounds = Eigen::Matrix<T, 5, 1>::Zero();
   lower_bounds << min_thrust,
-    -max_rollpitchrate, -max_rollpitchrate, -max_yawrate;
+    -max_rollpitchrate, -max_rollpitchrate, -max_yawrate, -max_jerk;
   upper_bounds << max_thrust,
-    max_rollpitchrate, max_rollpitchrate, max_yawrate;
+    max_rollpitchrate, max_rollpitchrate, max_yawrate, max_jerk;
 
   acado_lower_bounds_ =
     lower_bounds.replicate(1, kSamples).template cast<float>();
@@ -213,7 +216,7 @@ bool MpcWrapper<T>::setTrajectory(
   states_.row(3) = states.block(10, 0, 1, kSamples);
   states_.row(4) = states.block(11, 0, 1, kSamples);
 
-  acado_reference_states_ = states_.template cast<float>();
+  // acado_reference_states_ = states_.template cast<float>();
   // Store reference_states_ to use quaternion
   reference_states_.block(0, 0, kStateSize, kSamples) = 
     states.block(0, 0, kStateSize, kSamples).template cast<float>();
@@ -278,8 +281,11 @@ bool MpcWrapper<T>::update(
   }
 
   // Perform feedback step and reset preparation check.
-  acado_feedbackStep();
+  int solve_status = acado_feedbackStep();
   acado_is_prepared_ = false;
+
+  std::cout << "preparation_status " << preparation_status << std::endl;
+  std::cout << "QPOASES status " << solve_status << std::endl;
 
   // Prepare if the solver if wanted
   if(do_preparation)
@@ -334,6 +340,12 @@ void MpcWrapper<T>::getInputs(
   return_inputs = acado_inputs_.cast<T>();
 }
 
+template <typename T>
+void MpcWrapper<T>::getVerbose()
+{
+  acado_printDifferentialVariables();
+	acado_printControlVariables();
+}
 
 template class MpcWrapper<float>;
 template class MpcWrapper<double>;

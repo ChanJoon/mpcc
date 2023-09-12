@@ -127,7 +127,7 @@ class MPCC{
 		Matrix<double, kRefSize, 1> grad_y;
 		Matrix<double, kRefSize, 1> grad_z;
 
-		double max_bodyrate_xy_, max_bodyrate_z_, max_throttle_, min_throttle_, Q_pos_xy_, Q_pos_z_, Q_attitude_, Q_velocity_, R_thrust_, R_pitchroll_, R_yaw_, state_cost_exponential_, input_cost_exponential_;
+		double max_bodyrate_xy_, max_bodyrate_z_, max_throttle_, min_throttle_, max_jerk_, Q_pos_xy_, Q_pos_z_, Q_attitude_, Q_velocity_, R_thrust_, R_pitchroll_, R_yaw_, state_cost_exponential_, input_cost_exponential_;
 		
 		// ROS
 		ros::NodeHandle nh;
@@ -176,6 +176,7 @@ class MPCC{
 			nh.param("/min_throttle", min_throttle_, 0.0);
 			nh.param("/max_bodyrate_xy", max_bodyrate_xy_, 0.5);
 			nh.param("/max_bodyrate_z", max_bodyrate_z_, 0.5);
+			nh.param("/max_jerk", max_jerk_, 15.0);
 			nh.param("/Q_pos_xy", Q_pos_xy_, 0.1);
 			nh.param("/Q_pos_z", Q_pos_z_, 0.1);
 			nh.param("/Q_attitude", Q_attitude_, 0.1);
@@ -318,6 +319,9 @@ void MPCC::control_timer_func(const ros::TimerEvent& event){
 					}
 					pub_cmd();
 				}
+				if(curr_state.mode != "OFFBOARD"){
+					mpc_wrapper_.getVerbose();
+				}
 				return;
 			}
 		}
@@ -425,13 +429,15 @@ void MPCC::solve_mpc(){
 		est_state_(STATE::kVelT) = predicted_states_(STATE::kVelT, 1);
 		est_state_(STATE::kAccT) = predicted_states_(STATE::kAccT, 1);
 		// TODO: vt and at shows NaN
-		ROS_INFO("vt: %f, at: %f", est_state_(STATE::kVelT), est_state_(STATE::kAccT));
+		// ROS_INFO("vt: %f, at: %f", est_state_(STATE::kVelT), est_state_(STATE::kAccT));
 		mpc_wrapper_.update(est_state_, do_preparation_step);
 	}
 	mpc_wrapper_.getStates(predicted_states_);
 	mpc_wrapper_.getInputs(predicted_inputs_);
 
 	if(debug)
+		std::cout << "predicted_states_ " << predicted_states_.col(0) << std::endl;
+		std::cout << "predicted_inputs_ " << predicted_inputs_.col(0) << std::endl;
 		pub_predict(predicted_states_, predicted_inputs_, call_time);
 
 	preparation_thread_ = std::thread(&MPCC::preparationThread, this);
@@ -468,6 +474,11 @@ void MPCC::preparationThread() {
 }
 
 bool MPCC::set_params() {
+	Q_.setZero();
+	R_.setZero();
+	grad_x.setZero();
+	grad_y.setZero();
+	grad_z.setZero();
 	// TODO: 현재는 CMPCC 그대로 가져왔으나 추후 변수명이나, 선언 위치 리팩토링
 	double theta = 0.0;
 	if (solve_from_scratch_) {
@@ -490,15 +501,16 @@ bool MPCC::set_params() {
 	double r_y = y_v - dy_v__dtheta * theta;
 	double r_z = z_v - dz_v__dtheta * theta;
 	// MEMO: MPC처럼 cost function state를 model state와 맞추고, kRefSize = kStateSize + kInputSize로 하여 안쓰는 term은 0으로 놓아도 됌.
-	grad_x.coeffRef(0,0) = 1;
-	grad_y.coeffRef(1,0) = 1;
-	grad_z.coeffRef(2,0) = 1;
-	grad_x.coeffRef(3,0) = -dx_v__dtheta;
-	grad_y.coeffRef(3,0) = -dy_v__dtheta;
-	grad_z.coeffRef(3,0) = -dz_v__dtheta;
+	grad_x.coeffRef(0, 0) = 1;
+	grad_y.coeffRef(1, 0) = 1;
+	grad_z.coeffRef(2, 0) = 1;
+	grad_x.coeffRef(3, 0) = -dx_v__dtheta;
+	grad_y.coeffRef(3, 0) = -dy_v__dtheta;
+	grad_z.coeffRef(3, 0) = -dz_v__dtheta;
 	Q_ = grad_x * grad_x.transpose() + 
 				grad_y * grad_y.transpose() + 
 				grad_z * grad_z.transpose();
+	Q_.coeffRef(4, 4) = 1;
 	// Q_ = (Matrix<double, kRefSize, 1>() << Q_pos_xy_, Q_pos_xy_, Q_pos_z_
 			// Q_attitude_, Q_attitude_, Q_attitude_, Q_attitude_,
 			// Q_velocity_, Q_velocity_, Q_velocity_
@@ -513,11 +525,13 @@ bool MPCC::set_params() {
 
 	// R_ = (Matrix<double, kStateSize, 1>() << 
 			// R_thrust_, R_pitchroll_, R_pitchroll_, R_yaw_).finished().asDiagonal();
+	std::cout << "Q_" << Q_ << std::endl;
+	std::cout << "R_" << R_ << std::endl;
 
 	mpc_wrapper_.setCosts(Q_, R_, state_cost_exponential_, input_cost_exponential_);
 	mpc_wrapper_.setLimits(
 			min_throttle_, max_throttle_,
-			max_bodyrate_xy_, max_bodyrate_z_);
+			max_bodyrate_xy_, max_bodyrate_z_, max_jerk_);
 
 	changed_ = false;
 	return true;
