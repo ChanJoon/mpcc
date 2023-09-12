@@ -68,9 +68,9 @@ $$\begin{align}J&=\sum_{k=1}^N\{(\mu^{(k)}-\mu_p(t^{(k)}))^2-\rho\cdot v_t^{(k)}
 *Convert quadratic form(OSQP) to a weighted l2-norm(ACADO)*
 
 $$\begin{align}&=\sum_{k=1}^N\|W^{1/2}\begin{bmatrix}\mu\\t\\v_t\end{bmatrix}\|^2+q^T
-\begin{bmatrix}\mu\\t\\v_t\end{bmatrix}\\
-&=\sum_{k=1}^N\| \begin{bmatrix}\mu\\t\\v_t\end{bmatrix} \|^2_W+q^T\begin{bmatrix}\mu\\t\\v_t\end{bmatrix} \\
-s.t & \ \ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix} W=\begin{bmatrix}1 & -v_p(\theta)\\-v_p(\theta)&v_p^2(\theta)\end{bmatrix},\ q=\begin{bmatrix}2(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\\-2v_p(\theta)(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\\-\rho\end{bmatrix}^T\end{align}$$
+\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix}\\
+&=\sum_{k=1}^N\| \begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} \|^2_W+q^T\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} \\
+s.t & \ \ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix} W=\begin{bmatrix}1 & -v_p(\theta)\cr -v_p(\theta)&v_p^2(\theta)\end{bmatrix},\ q=\begin{bmatrix}2(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\cr -2v_p(\theta)(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T\end{align}$$
 
 **The states and inputs**
 
