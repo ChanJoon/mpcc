@@ -121,11 +121,12 @@ class MPCC{
 		Matrix<double, kInputSize, kSamples + 1> reference_inputs_;
 		Matrix<double, kStateSize, kSamples + 1> predicted_states_;
 		Matrix<double, kInputSize, kSamples> predicted_inputs_;
-		Matrix<double, kRefSize, kRefSize> Q_;
-		Matrix<double, kStateSize, 1> R_;
-		Matrix<double, kRefSize, 1> grad_x;
-		Matrix<double, kRefSize, 1> grad_y;
-		Matrix<double, kRefSize, 1> grad_z;
+		Matrix<double, kStateSize, kStateSize> Q_;
+		Matrix<double, kInputSize, kInputSize> R_;
+		Matrix<double, kStateSize, 1> q_;
+		Matrix<double, kStateSize, 1> grad_x;
+		Matrix<double, kStateSize, 1> grad_y;
+		Matrix<double, kStateSize, 1> grad_z;
 
 		double max_bodyrate_xy_, max_bodyrate_z_, max_throttle_, min_throttle_, max_jerk_, Q_pos_xy_, Q_pos_z_, Q_attitude_, Q_velocity_, R_thrust_, R_pitchroll_, R_yaw_, state_cost_exponential_, input_cost_exponential_;
 		
@@ -308,7 +309,7 @@ void MPCC::control_timer_func(const ros::TimerEvent& event){
 				est_state_ << 0, 0, 0, 
 											1, 0, 0, 0,
 											0, 0, 0,
-											0, 0, 0;
+											ctrl_start_time.toSec(), 0, 0;
 				return;
 			}
 			else{
@@ -347,6 +348,9 @@ void MPCC::pub_cmd(){
 	if(L1_on){
 		compute_L1adaptive();
 	}
+	else{
+		ada_cmd.setZero();
+	}
 	// Pub commands
 	att_msg.header.stamp = ros::Time::now();
 	att_msg.header.frame_id = "map";
@@ -357,7 +361,6 @@ void MPCC::pub_cmd(){
 	att_msg.body_rate.z = ctbr_cmd(INPUT::kRateZ)+ada_cmd(2);
 
 	att_msg.thrust = throttle_mapping(ctbr_cmd(INPUT::kThrust)+ada_cmd(3));
-	// MEMO: We don't use dummy input jerk
 
 	ROS_INFO("r: %.2f p: %.2f y: %.2f Thrust: %.2f", 
 						att_msg.body_rate.x, att_msg.body_rate.y, att_msg.body_rate.z, att_msg.thrust);
@@ -373,6 +376,7 @@ void MPCC::pub_cmd(){
 void MPCC::solve_mpc(){
 	ros::Time call_time = ros::Time::now();	// == tMPC(CMPCC)
 	const clock_t start = clock();
+
 	// Set cost weight matrices dynamically (remove boolean `changed_`)
 	set_params();
 	// Setup
@@ -402,7 +406,7 @@ void MPCC::solve_mpc(){
 		reference_states_(7, i) = t_vel(0);
 		reference_states_(8, i) = t_vel(1);
 		reference_states_(9, i) = t_vel(2);
-		// TODO: What reference t, vt, at will be in i to kSamples?
+		// TODO: What reference t, vt, at will be in i to kSamples? dt = 0.5
 		reference_states_(10, i) = target_traj.poses[i].header.stamp.toSec();				// t
 		reference_states_(11, i) = 0;				// vt
 		reference_states_(12, i) = 0;				// at
@@ -414,6 +418,8 @@ void MPCC::solve_mpc(){
 		reference_inputs_(4, i) = 0;			// jt
 		theta_max += target_traj.poses[i].header.stamp.toSec();
 	}
+	std::cout << "reference_states_t" << std::endl;
+	std::cout << reference_states_.row(10) << std::endl;
 	// Get the feedback from MPC.
 	mpc_wrapper_.setTrajectory(reference_states_, reference_inputs_);
 
@@ -428,17 +434,20 @@ void MPCC::solve_mpc(){
 		// TODO: Refactoring
 		est_state_(STATE::kVelT) = predicted_states_(STATE::kVelT, 1);
 		est_state_(STATE::kAccT) = predicted_states_(STATE::kAccT, 1);
-		// TODO: vt and at shows NaN
-		// ROS_INFO("vt: %f, at: %f", est_state_(STATE::kVelT), est_state_(STATE::kAccT));
 		mpc_wrapper_.update(est_state_, do_preparation_step);
 	}
 	mpc_wrapper_.getStates(predicted_states_);
 	mpc_wrapper_.getInputs(predicted_inputs_);
 
-	if(debug)
-		std::cout << "predicted_states_ " << predicted_states_.col(0) << std::endl;
-		std::cout << "predicted_inputs_ " << predicted_inputs_.col(0) << std::endl;
+	if(debug){
+		std::cout << "est_state_ " << std::endl;
+		std::cout << est_state_ << std::endl;
+		std::cout << "predicted_states_ " << std::endl;
+		std::cout << predicted_states_.col(0) << std::endl;
+		// std::cout << "predicted_inputs_ " << std::endl;
+		// std::cout << predicted_inputs_.col(0) << std::endl;
 		pub_predict(predicted_states_, predicted_inputs_, call_time);
+	}
 
 	preparation_thread_ = std::thread(&MPCC::preparationThread, this);
 
@@ -474,19 +483,18 @@ void MPCC::preparationThread() {
 }
 
 bool MPCC::set_params() {
-	Q_.setZero();
-	R_.setZero();
 	grad_x.setZero();
 	grad_y.setZero();
 	grad_z.setZero();
-	// TODO: 현재는 CMPCC 그대로 가져왔으나 추후 변수명이나, 선언 위치 리팩토링
+
 	double theta = 0.0;
 	if (solve_from_scratch_) {
-		theta = 1.0;
+		theta = ctrl_start_time.toSec();
 	}
 	else {
 		theta = est_state_(STATE::kTime);
 	}
+	std::cout << "theta " << theta << std::endl;
 	// TODO: getGlobalCommand(theta, pos, vel);
 	// 우선 pos(theta), vel(theta) 대신 target_odom callback에서 받은 변수로 대체
 	// CMPCC에서는 최대 global_traj_time과 theta를 std::fmod로 [0, max_theta)로 mapping
@@ -500,35 +508,39 @@ bool MPCC::set_params() {
 	double r_x = x_v - dx_v__dtheta * theta;
 	double r_y = y_v - dy_v__dtheta * theta;
 	double r_z = z_v - dz_v__dtheta * theta;
-	// MEMO: MPC처럼 cost function state를 model state와 맞추고, kRefSize = kStateSize + kInputSize로 하여 안쓰는 term은 0으로 놓아도 됌.
 	grad_x.coeffRef(0, 0) = 1;
 	grad_y.coeffRef(1, 0) = 1;
 	grad_z.coeffRef(2, 0) = 1;
-	grad_x.coeffRef(3, 0) = -dx_v__dtheta;
-	grad_y.coeffRef(3, 0) = -dy_v__dtheta;
-	grad_z.coeffRef(3, 0) = -dz_v__dtheta;
-	Q_ = grad_x * grad_x.transpose() + 
+	grad_x.coeffRef(10, 0) = -dx_v__dtheta;
+	grad_y.coeffRef(10, 0) = -dy_v__dtheta;
+	grad_z.coeffRef(10, 0) = -dz_v__dtheta;
+	Matrix<double, kStateSize, kStateSize> Q_tmp = 
+				grad_x * grad_x.transpose() + 
 				grad_y * grad_y.transpose() + 
 				grad_z * grad_z.transpose();
-	Q_.coeffRef(4, 4) = 1;
-	// Q_ = (Matrix<double, kRefSize, 1>() << Q_pos_xy_, Q_pos_xy_, Q_pos_z_
+
+	Q_ = Q_tmp;
+	// Q_.block(3, 3, 7, 7) = (Matrix<double, 7, 1>() <<
 			// Q_attitude_, Q_attitude_, Q_attitude_, Q_attitude_,
 			// Q_velocity_, Q_velocity_, Q_velocity_
 			// ).finished().asDiagonal();
-	Matrix<double, kRefSize, 1> R_tmp = -r_x*grad_x - r_y*grad_y - r_z*grad_z;
-	R_.coeffRef(0, 0) = R_tmp.coeff(0, 0);
-	R_.coeffRef(1, 0) = R_tmp.coeff(1, 0);
-	R_.coeffRef(2, 0) = R_tmp.coeff(2, 0);
-	R_.coeffRef(10, 0) = R_tmp.coeff(3, 0);
-	R_.coeffRef(11, 0) = -rho;
+	// Q_.coeffRef(kStateSize-2, kStateSize-2) = 1;
+	// Q_.coeffRef(kStateSize-1, kStateSize-1) = 1;
+	Q_.block(3, 3, 10, 10) = Matrix<double, 10, 10>::Identity();
 
 
-	// R_ = (Matrix<double, kStateSize, 1>() << 
-			// R_thrust_, R_pitchroll_, R_pitchroll_, R_yaw_).finished().asDiagonal();
-	std::cout << "Q_" << Q_ << std::endl;
-	std::cout << "R_" << R_ << std::endl;
+	R_.setIdentity();
+	// R_ = (Matrix<double, kInputSize, 1>() << 
+			// R_thrust_, R_pitchroll_, R_pitchroll_, R_yaw_, 1.0).finished().asDiagonal();
 
-	mpc_wrapper_.setCosts(Q_, R_, state_cost_exponential_, input_cost_exponential_);
+	q_ = -r_x*grad_x - r_y*grad_y - r_z*grad_z;
+	q_.coeffRef(11, 0) = -rho;
+
+	std::cout << "Q_ [" << std::endl << Q_ << " ]" << std::endl;
+	std::cout << "R_ [" << std::endl << R_ << " ]" << std::endl;
+	std::cout << "q_ [" << std::endl << q_ << " ]" << std::endl;
+
+	mpc_wrapper_.setCosts(Q_, R_, q_, state_cost_exponential_, input_cost_exponential_);
 	mpc_wrapper_.setLimits(
 			min_throttle_, max_throttle_,
 			max_bodyrate_xy_, max_bodyrate_z_, max_jerk_);
@@ -553,7 +565,6 @@ bool MPCC::set_state_est() {
 	//TODO: Implement a function finding nearest theta based on CMPCC
 	// est_state_(STATE::kTime) = findNearestTheta(t_pos);
 	est_state_(STATE::kTime) = t_odom.toSec();
-	// DONE: At first, vt, at are zero. After solved, vt, at are brought from result of prediction.
 	est_state_(STATE::kVelT) = 0;
 	est_state_(STATE::kAccT) = 0;
 	return true;

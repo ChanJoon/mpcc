@@ -91,10 +91,17 @@ int main( ){
   // Cost: Sum(i=0, ..., N-1){h_i' * Q * h_i} + h_N' * Q_N * h_N
   // Running cost vector consists of position, time, v_time.
   h << p_x << p_y << p_z
-    << t << vt;
+    << q_w << q_x << q_y << q_z
+    << v_x << v_y << v_z
+    << t << vt << at
+    << T << w_x << w_y << w_z
+    << jt;
 
   // End cost vector consists of all states (no inputs at last state).
-  hN << p_x << p_y << p_z;
+  hN << p_x << p_y << p_z
+    << q_w << q_x << q_y << q_z
+    << v_x << v_y << v_z
+    << t << vt << at;
 
 
 

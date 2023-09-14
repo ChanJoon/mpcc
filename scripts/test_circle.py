@@ -79,6 +79,10 @@ def hover():
                 traj_msg.poses.append(pose_msg)
 
         t=t+dt
+        # rospy.loginfo("target odom t: %f", msg.header.stamp.to_sec())
+        # rospy.loginfo("target traj t: %f", traj_msg.header.stamp.to_sec())
+        # rospy.loginfo("target traj t0: %f", traj_msg.poses[0].header.stamp.to_sec())
+        # rospy.loginfo("target traj tN: %f", traj_msg.poses[-1].header.stamp.to_sec())
         pub.publish(msg)  
         pub_path.publish(path_msg)
         pub_traj.publish(traj_msg)

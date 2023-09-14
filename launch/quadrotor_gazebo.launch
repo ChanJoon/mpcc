@@ -59,5 +59,5 @@
         <arg name="respawn_mavros" value="$(arg respawn_mavros)"/>
     </include>
 
-    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find sh_mpc)/test.rviz" />
+    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find mpcc)/test.rviz" />
 </launch>

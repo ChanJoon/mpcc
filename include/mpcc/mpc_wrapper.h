@@ -35,18 +35,13 @@ namespace mpcc {
 static constexpr int kSamples = ACADO_N;      // number of samples
 // 20 
 static constexpr int kStateSize = ACADO_NX;   // number of states(=differential state variables)
-// 13 (13 states)
+// 13
 static constexpr int kInputSize = ACADO_NU;   // number of inputs
-// 5 (5 inputs)
+// 5
 static constexpr int kRefSize = ACADO_NY;     // number of reference states
-// 5 (5 states)
+// 18 (13+5)
 static constexpr int kEndRefSize = ACADO_NYN; // number of end reference states
-// 3 (3 states) = hN 변수개수, Code generation을 위해 임의로 두었고 MPCC에서는 사용 X
-static constexpr int kCostSize = ACADO_NY - ACADO_NU; // number of state costs
-// 0 (p_x, p_y, p_z, t, vt) - (T, w_x, w_y, w_z, jt)
-// rpg_mpc에서 h_cost= state_cost + input_cost; kCostSize = kStateSize
-// h_cost matrix W = kStateSize + kInputSize, kN_cost matrix WN = kStateSize
-// mpcc에서는 WN = null, W = kRefSize
+// 13, Code generation을 위해 임의로 두었고 MPCC에서는 사용 X
 static constexpr int kOdSize = ACADO_NOD;     // number of online data
 // 0 일단 불필요함
 
@@ -63,12 +58,14 @@ class MpcWrapper
 
   MpcWrapper();
   MpcWrapper(
-    const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize>> Q,
-    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> R);
+    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kStateSize>> Q,
+    const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kInputSize>> R,
+    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> q);
 
   bool setCosts(
-    const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize>> Q,
-    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> R,
+    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kStateSize>> Q,
+    const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kInputSize>> R,
+    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> q,
     const T state_cost_scaling = 0.0, const T input_cost_scaling = 0.0);
 
   bool setLimits(T min_thrust, T max_thrust,
@@ -102,7 +99,7 @@ class MpcWrapper
  private:
   Eigen::Map<Eigen::Matrix<float, kRefSize, kSamples, Eigen::ColMajor>>
     acado_reference_states_{acadoVariables.y};
-  Eigen::Matrix<float, kStateSize, kSamples> reference_states_;
+  Eigen::Matrix<float, kRefSize, kSamples> reference_states_;
 
   Eigen::Map<Eigen::Matrix<float, kEndRefSize, 1, Eigen::ColMajor>>
     acado_reference_end_state_{acadoVariables.yN};
@@ -128,30 +125,30 @@ class MpcWrapper
   // Linear term weighting vector
   Eigen::Map<Eigen::Matrix<float, kStateSize*(kSamples+1), 1, Eigen::ColMajor>>
     acado_Wlx_{acadoVariables.Wlx};
+
   Eigen::Map<Eigen::Matrix<float, kInputSize*kSamples, 1, Eigen::ColMajor>>
     acado_Wlu_{acadoVariables.Wlu};
 
-// TODO: rpg_mpc에서는 T, w로 4개에 대해 constraints를 사용함. jt에 대해 추가되는 경우, dimension 수정 필요
   Eigen::Map<Eigen::Matrix<float, 5, kSamples, Eigen::ColMajor>>
     acado_lower_bounds_{acadoVariables.lbValues};
 
   Eigen::Map<Eigen::Matrix<float, 5, kSamples, Eigen::ColMajor>>
     acado_upper_bounds_{acadoVariables.ubValues};
 
-//TODO: cost weight를 ACADO Q에 맞게 임의로 상수로 부여함. 추후 수정 필요.
   Eigen::Matrix<T, kRefSize, kRefSize> W_ = (Eigen::Matrix<T, kRefSize, 1>() <<
     10 * Eigen::Matrix<T, 3, 1>::Ones(),
-    1 * Eigen::Matrix<T, 2, 1>::Ones()).finished().asDiagonal();
+    100 * Eigen::Matrix<T, 4, 1>::Ones(),
+    10 * Eigen::Matrix<T, 3, 1>::Ones(),
+    1 * Eigen::Matrix<T, 3, 1>::Ones(),
+    1 * Eigen::Matrix<T, 4, 1>::Ones(),
+    1.0).finished().asDiagonal();
 
   Eigen::Matrix<T, kEndRefSize, kEndRefSize> WN_ =
     W_.block(0, 0, kEndRefSize, kEndRefSize);
 
-// DONE: Wlx_ 초기화
-  Eigen::Matrix<T, kStateSize, 1> Wlx_ =
-    (Eigen::Matrix<T, kStateSize, 1>() << 0.0, 0.0, 0.0,
-                                          0.0, 0.0, 0.0, 0.0,
-                                          0.0, 0.0, 0.0,
-                                          0.0, 0.0, 0.0).finished();
+  Eigen::Matrix<T, kStateSize, 1> Wlx_ = Eigen::Matrix<T, kStateSize, 1>::Zero();
+
+  Eigen::Matrix<T, kInputSize, 1> Wlu_ = Eigen::Matrix<T, kInputSize, 1>::Zero();
 
   bool acado_is_prepared_{false};
   const T dt_{0.1};

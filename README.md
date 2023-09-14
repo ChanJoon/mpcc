@@ -1,6 +1,16 @@
 # Model Predicive Contouring Control
 
 ### Updates
+- 23-09-14
+  - [acado 메뉴얼](https://acado.sourceforge.net/doc/pdf/acado_manual.pdf) p.103-105에 따라 `acado model`, `mpc_wrapper`, `mpc_test` 파일 모두 수정
+    - [quadrotor_model_thrustrates.cpp](model/quadrotor_model_thrustrates.cpp): 기존 MPC처럼 `h`, `hN`을 각각 state+input, state 벡터로 변경해줌. (메뉴얼 p.105 참고)
+    - [mpc_wrapper.cpp](src/mpc_wrapper.cpp): 위 모델에 맞게 기존 MPC와 유사하게 matrix 크기를 수정해줌. 예를 들어, `kRefSize` 였던 `Q`를 `kStateSize`로 수정하고 R도 `kInputSize`로 수정함. 이전 업데이트에서는 `Q`를 quadratic term의 weight matrix, `R`을 linear term weight matrix로 사용했지만, 기존 MPC처럼 Q+R로 바꿔주고 새로운 `q`로 linear term weight matrix로 사용하고 이에 맞게 `setCosts`나 `set_params` 수정.
+  - 디버깅:
+    - `acado_feedbackStep()`의 returnValue로 qpOASES의 상태를 확인할 수 있는데, 기존 방식(reference의 5개의 state만 사용)에서는 31을 반환함. 이는 **RET_DIFFERENTIAL_STATE_DIMENSION_MISMATCH**에 해당함.([참고 L101](http://docs.ros.org/en/melodic/api/acado/html/acado__message__handling_8cpp_source.html))
+    - 원인을 메뉴얼대로 모델을 사용하지 않은 것으로 추측하여, 위 수정사항 설명처럼 `LSQTerm`을 state+input으로 구성하고 weight matrix에서 0을 넣어주고자 하였음.(아래 Cost function 참고) 문제는 `Q`(mpc_wrapper) 또는 `W`(acadoVarialbes.W)의 quaternion, velocity 등에 0을 넣어주면 ODE constraint에서 풀리지 않아(메뉴얼 p.103) gazebo 테스트에서 rpy값이 0이 나옴.
+    - 따라서, $[p_x, p_y, p_z, t, v_t]$를 제외한 state와 input은 weight를 1로 넣어줌.
+    - `t`,`vt`,`at` 쪽은 출력으로 확인해보니 ros Time에서 seconds로 바뀌면서 전체 horizon `N`에 대해 같은 값을 가지고 있음. `est_state_`나 `predicted_states_`의 값이 적절해보이고, ODE모델에서 다른 state나 input에 영향이 없으므로 현재 문제의 원인으로는 고려 X. 추후 수정 필요해보임.
+    - $l_2$-norm 의 weight matrix `W`에 0을 넣으면 문제가 생기는 것은 파악했으나, `Wlx`가 어떤 식으로 사용되는지 명확하지 않아 확인이 필요함.
 - 23-09-12
   - 기존 Cost function을 quadratic form 에서 $l_2$-norm으로 바꿔줌. OSQP에서는 Reference에 해당하는 부분을 $x^TQx+q^Tx$의 $Q, q$에 넣어주었지만, ACADO에서는 별도로 reference state가 주어진다. 따라서 *acadoVariables.y*에는 0을 넣어주고 weight matrix를 그대로 사용하고자 함.
   - Gazebo 테스트 중 비정상적으로 비행하여서, 출력문을 통해 디버깅 중.
@@ -52,7 +62,9 @@
   - [x] : Modify `est_state_`, `reference_states_` with reference to CMPCC(*Update some states from last horizon*)
   - [ ] : ~~Implement `findNearestTheta` and `getGlobalCommand`~~ (Currently using target topics)
   - [x] : Fix `NaN` values from `predicted_states_(STATE::kVelT, 1)` and `(State::kAccT)`
-  - [ ] : Test roslaunch and parameter tuning
+  - [x] : Test roslaunch and parameter tuning
+  - [ ] : Fix unstable preicted trajectory and control inputs
+  - [ ] : Figure out how `Wlx` works in acado
 
 ### Cost function 
 
@@ -65,11 +77,12 @@ $$\begin{align}J&=\sum_{k=1}^N\{(\mu^{(k)}-\mu_p(t^{(k)}))^2-\rho\cdot v_t^{(k)}
 \begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix}\end{align}$$
 
 ---
-*Convert quadratic form(OSQP) to a weighted l2-norm(ACADO)*
+*Convert quadratic form(OSQP) to a weighted $l_2$-norm(ACADO)*
 
 $$\begin{align}&=\sum_{k=1}^N\|W^{1/2}\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix}\|^2+q^T
 \begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix}\\
-&=\sum_{k=1}^N\| \begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} \|^2_W+q^T\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} \\
+&=\sum_{k=1}^N\| \begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} - \begin{bmatrix}0\cr 0 \cr 0\end{bmatrix} \|^2_W+q^T\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} \\
+&=\sum_{k=1}^N\| h(x_k, u_k) - \bar{y_k}\|^2_W+\textbf{Wlx}^Tx_k \ \text{(linear term)} \tag*{(ACADO p.103)}\\
 s.t & \ \ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix} W=\begin{bmatrix}1 & -v_p(\theta)\cr -v_p(\theta)&v_p^2(\theta)\end{bmatrix},\ q=\begin{bmatrix}2(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\cr -2v_p(\theta)(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T\end{align}$$
 
 **The states and inputs**
