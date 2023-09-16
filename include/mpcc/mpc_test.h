@@ -418,8 +418,6 @@ void MPCC::solve_mpc(){
 		reference_inputs_(4, i) = 0;			// jt
 		theta_max += target_traj.poses[i].header.stamp.toSec();
 	}
-	std::cout << "reference_states_t" << std::endl;
-	std::cout << reference_states_.row(10) << std::endl;
 	// Get the feedback from MPC.
 	mpc_wrapper_.setTrajectory(reference_states_, reference_inputs_);
 
@@ -440,10 +438,10 @@ void MPCC::solve_mpc(){
 	mpc_wrapper_.getInputs(predicted_inputs_);
 
 	if(debug){
-		std::cout << "est_state_ " << std::endl;
-		std::cout << est_state_ << std::endl;
-		std::cout << "predicted_states_ " << std::endl;
-		std::cout << predicted_states_.col(0) << std::endl;
+		// std::cout << "est_state_ " << std::endl;
+		// std::cout << est_state_ << std::endl;
+		// std::cout << "predicted_states_ " << std::endl;
+		// std::cout << predicted_states_.col(0) << std::endl;
 		// std::cout << "predicted_inputs_ " << std::endl;
 		// std::cout << predicted_inputs_.col(0) << std::endl;
 		pub_predict(predicted_states_, predicted_inputs_, call_time);
@@ -494,7 +492,7 @@ bool MPCC::set_params() {
 	else {
 		theta = est_state_(STATE::kTime);
 	}
-	std::cout << "theta " << theta << std::endl;
+	// std::cout << "theta " << theta << std::endl;
 	// TODO: getGlobalCommand(theta, pos, vel);
 	// 우선 pos(theta), vel(theta) 대신 target_odom callback에서 받은 변수로 대체
 	// CMPCC에서는 최대 global_traj_time과 theta를 std::fmod로 [0, max_theta)로 mapping
@@ -536,8 +534,8 @@ bool MPCC::set_params() {
 	q_ = -r_x*grad_x - r_y*grad_y - r_z*grad_z;
 	q_.coeffRef(11, 0) = -rho;
 
-	std::cout << "Q_ [" << std::endl << Q_ << " ]" << std::endl;
-	std::cout << "R_ [" << std::endl << R_ << " ]" << std::endl;
+	// std::cout << "Q_ [" << std::endl << Q_ << " ]" << std::endl;
+	// std::cout << "R_ [" << std::endl << R_ << " ]" << std::endl;
 	std::cout << "q_ [" << std::endl << q_ << " ]" << std::endl;
 
 	mpc_wrapper_.setCosts(Q_, R_, q_, state_cost_exponential_, input_cost_exponential_);

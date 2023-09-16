@@ -1,13 +1,27 @@
 # Model Predicive Contouring Control
 
+|Iris|Typhoon_h480| |
+|---|---|---|
+|![Iris with mpc_test.launch](images/iris_test.gif)|![Typhoon_h480 with mpc_kepco_test.launch](images/h480_kepco_test.gif)|![Typhoon_h480 with mpc_test.launch](images/h480_test.gif)|
+
 ### Updates
+- 23-09-16
+  - [mpc_wrapper.cpp](src/mpc_wrapper.cpp):
+    - 아래 디버깅 파트 설명 중 qpOASES에서 31을 반환하여, quadratic form의 일부 state와 input에 weight를 1로 두었다. 이렇게 되면  $q^2, v^2$으로 들어가 Cost function과 맞지 않음.
+    - 그래서 `acado_reference_state_`를 모두 0으로 하지 않고 $[q_w, q_x, q_y, q_z, v_x, v_y, v_z, a_t \|T, w_x, w_y, w_z]$에는 값을 넣어줌.
+    - Cost function에서 사용하는 $\|\begin{bmatrix}p_x\cr p_y\cr p_z\cr t\cr v_t\end{bmatrix}-\begin{bmatrix}0\cr 0\cr 0\cr 0\cr 0\end{bmatrix}\|$에는 $W$가 적용되고, 나머지에는 1로 weight 적용됨.
 - 23-09-14
   - [acado 메뉴얼](https://acado.sourceforge.net/doc/pdf/acado_manual.pdf) p.103-105에 따라 `acado model`, `mpc_wrapper`, `mpc_test` 파일 모두 수정
-    - [quadrotor_model_thrustrates.cpp](model/quadrotor_model_thrustrates.cpp): 기존 MPC처럼 `h`, `hN`을 각각 state+input, state 벡터로 변경해줌. (메뉴얼 p.105 참고)
-    - [mpc_wrapper.cpp](src/mpc_wrapper.cpp): 위 모델에 맞게 기존 MPC와 유사하게 matrix 크기를 수정해줌. 예를 들어, `kRefSize` 였던 `Q`를 `kStateSize`로 수정하고 R도 `kInputSize`로 수정함. 이전 업데이트에서는 `Q`를 quadratic term의 weight matrix, `R`을 linear term weight matrix로 사용했지만, 기존 MPC처럼 Q+R로 바꿔주고 새로운 `q`로 linear term weight matrix로 사용하고 이에 맞게 `setCosts`나 `set_params` 수정.
+    - [quadrotor_model_thrustrates.cpp](model/quadrotor_model_thrustrates.cpp):
+      - 기존 MPC처럼 `h`, `hN`을 각각 state+input, state 벡터로 변경해줌. (메뉴얼 p.105 참고)
+    - [mpc_wrapper.cpp](src/mpc_wrapper.cpp):
+      - 위 모델에 맞게 기존 MPC와 유사하게 matrix 크기를 수정해줌.
+      - 예를 들어, `kRefSize` 였던 `Q`를 `kStateSize`로 수정하고 R도 `kInputSize`로 수정함.
+      - 이전 업데이트에서는 `Q`를 quadratic term의 weight matrix, `R`을 linear term weight matrix로 사용했지만, 기존 MPC처럼 Q+R로 바꿔주고 새로운 `q`로 linear term weight matrix로 사용하고 이에 맞게 `setCosts`나 `set_params` 수정.
   - 디버깅:
     - `acado_feedbackStep()`의 returnValue로 qpOASES의 상태를 확인할 수 있는데, 기존 방식(reference의 5개의 state만 사용)에서는 31을 반환함. 이는 **RET_DIFFERENTIAL_STATE_DIMENSION_MISMATCH**에 해당함.([참고 L101](http://docs.ros.org/en/melodic/api/acado/html/acado__message__handling_8cpp_source.html))
-    - 원인을 메뉴얼대로 모델을 사용하지 않은 것으로 추측하여, 위 수정사항 설명처럼 `LSQTerm`을 state+input으로 구성하고 weight matrix에서 0을 넣어주고자 하였음.(아래 Cost function 참고) 문제는 `Q`(mpc_wrapper) 또는 `W`(acadoVarialbes.W)의 quaternion, velocity 등에 0을 넣어주면 ODE constraint에서 풀리지 않아(메뉴얼 p.103) gazebo 테스트에서 rpy값이 0이 나옴.
+    - 원인을 메뉴얼대로 모델을 사용하지 않은 것으로 추측하여, 위 수정사항 설명처럼 `LSQTerm`을 state+input으로 구성하고 weight matrix에서 0을 넣어주고자 하였음.(아래 Cost function 참고)
+    - 문제는 `Q`(mpc_wrapper) 또는 `W`(acadoVarialbes.W)의 quaternion, velocity 등에 0을 넣어주면 ODE constraint에서 풀리지 않아(메뉴얼 p.103) gazebo 테스트에서 rpy값이 0이 나옴.
     - 따라서, $[p_x, p_y, p_z, t, v_t]$를 제외한 state와 input은 weight를 1로 넣어줌.
     - `t`,`vt`,`at` 쪽은 출력으로 확인해보니 ros Time에서 seconds로 바뀌면서 전체 horizon `N`에 대해 같은 값을 가지고 있음. `est_state_`나 `predicted_states_`의 값이 적절해보이고, ODE모델에서 다른 state나 input에 영향이 없으므로 현재 문제의 원인으로는 고려 X. 추후 수정 필요해보임.
     - $l_2$-norm 의 weight matrix `W`에 0을 넣으면 문제가 생기는 것은 파악했으나, `Wlx`가 어떤 식으로 사용되는지 명확하지 않아 확인이 필요함.
@@ -63,7 +77,7 @@
   - [ ] : ~~Implement `findNearestTheta` and `getGlobalCommand`~~ (Currently using target topics)
   - [x] : Fix `NaN` values from `predicted_states_(STATE::kVelT, 1)` and `(State::kAccT)`
   - [x] : Test roslaunch and parameter tuning
-  - [ ] : Fix unstable preicted trajectory and control inputs
+  - [x] : Fix unstable preicted trajectory and control inputs
   - [ ] : Figure out how `Wlx` works in acado
 
 ### Cost function 

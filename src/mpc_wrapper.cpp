@@ -149,6 +149,10 @@ bool MpcWrapper<T>::setCosts(
 
   acado_W_end_ = WN_.template cast<float>();
 
+  std::cout << "acadoVariable.W [" << std::endl << acado_W_.block(0, 0, kRefSize, kRefSize) << "]" << std::endl;
+  // std::cout << "acadoVariable.Wlx [" << std::endl << acado_Wlx_.block(0, 0, kStateSize, 1) << "]" << std::endl;
+  // std::cout << "acadoVariable.WN [" << std::endl << acado_W_end_.block(0, 0, kEndRefSize, kEndRefSize) << "]" << std::endl;
+
   return true;
 }
 
@@ -230,16 +234,20 @@ bool MpcWrapper<T>::setTrajectory(
     y(const_cast<float*>(acadoVariables.y));
 
   acado_reference_states_.setZero();
-  // acado_reference_states_.block(0, 0, kStateSize, kSamples) =
-    // states.block(0, 0, kStateSize, kSamples).template cast<float>();
-  // acado_reference_states_.block(kStateSize, 0, kInputSize, kSamples) =
-    // inputs.block(0, 0, kInputSize, kSamples).template cast<float>();
+  // q_w, q_x, q_y, q_z, v_x, v_y, v_z
+  acado_reference_states_.block(3, 0, kStateSize-6, kSamples) =
+    states.block(3, 0, kStateSize-6, kSamples).template cast<float>();
+  // at
+  acado_reference_states_.block(kStateSize-1, 0, 1, kSamples) =
+    states.block(kStateSize-1, 0, 1, kSamples).template cast<float>();
+  acado_reference_states_.block(kStateSize, 0, kInputSize, kSamples) =
+    inputs.block(0, 0, kInputSize, kSamples).template cast<float>();
 
 // Store reference_states_ to use quaternion
-  reference_states_.block(0, 0, kStateSize, kSamples) =
-    states.block(0, 0, kStateSize, kSamples).template cast<float>();
-  reference_states_.block(kStateSize, 0, kInputSize, kSamples) =
-    inputs.block(0, 0, kInputSize, kSamples).template cast<float>();
+  // reference_states_.block(0, 0, kStateSize, kSamples) =
+    // states.block(0, 0, kStateSize, kSamples).template cast<float>();
+  // reference_states_.block(kStateSize, 0, kInputSize, kSamples) =
+    // inputs.block(0, 0, kInputSize, kSamples).template cast<float>();
 
 // We don't use acado_reference_end_state.
   // acado_reference_end_state_.segment(0, kStateSize) =
@@ -285,12 +293,15 @@ bool MpcWrapper<T>::update(
     ROS_WARN("MPC: Solver was triggered without preparation, abort!");
     return false;
   }
+  std::cout << "acado_states_ [" << std::endl << acado_states_.col(0) << "]" << std::endl;
+  std::cout << "acado_reference_states_ [" << std::endl << acado_reference_states_.col(0) << "]" << std::endl;
+
 
   // Check if estimated and reference quaternion live in sthe same hemisphere.
   acado_initial_state_ = state.template cast<float>();
   if(acado_initial_state_.segment(3,4).dot(
-    // Eigen::Vector4f(acado_reference_states_.block(3,0,4,1)))<(T)0.0)
-    Eigen::Vector4f(reference_states_.block(3,0,4,1)))<(T)0.0)
+    Eigen::Vector4f(acado_reference_states_.block(3,0,4,1)))<(T)0.0)
+    // Eigen::Vector4f(reference_states_.block(3,0,4,1)))<(T)0.0)
   {
     acado_initial_state_.segment(3,4) = -acado_initial_state_.segment(3,4);
   }
@@ -301,6 +312,7 @@ bool MpcWrapper<T>::update(
 
   // std::cout << "preparation_status " << preparation_status << std::endl;
   std::cout << "QPOASES status " << solve_status << std::endl;
+  std::cout << "Objective value " << acado_getObjective() << std::endl;
 
   // Prepare if the solver if wanted
   if(do_preparation)
