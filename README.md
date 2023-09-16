@@ -1,8 +1,12 @@
 # Model Predicive Contouring Control
 
-|Iris|Typhoon_h480| |
-|---|---|---|
-|![Iris with mpc_test.launch](images/iris_test.gif)|![Typhoon_h480 with mpc_kepco_test.launch](images/h480_kepco_test.gif)|![Typhoon_h480 with mpc_test.launch](images/h480_test.gif)|
+### Demos
+
+| <img src="images/iris_test.gif" alt="Iris with mpc_test.launch" width="500"/> | <img src="images/h480_test.gif" alt="Typhoon_h480 with mpc_test.launch" width="500"/> |
+|:--:|:--:|
+|**Iris with mpc_test.launch**|**Typhoon_h480 with mpc_test.launch**|
+| <img src="images/h480_kepco_test.gif" alt="Typhoon_h480 with mpc_kepco_test.launch" width="500"/> |
+|**Typhoon_h480 with mpc_kepco_test.launch**|
 
 ### Updates
 - 23-09-16
