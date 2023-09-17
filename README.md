@@ -98,9 +98,9 @@ $$\begin{align}J&=\sum_{k=1}^N\{\sum_{\mu=x,y,z}(\mu^{(k)}-\mu_p(t^{(k)}))^2-\rh
 ---
 *Convert quadratic form(OSQP) to a weighted $`l_2`$-norm(ACADO)*
 
-$$\begin{align}&=\sum_{k=1}^N\| \begin{bmatrix}p_x\cr p_y\cr p_z\cr t\cr v_t\end{bmatrix} - \begin{bmatrix}0\cr 0 \cr 0\cr 0\cr 0\end{bmatrix} \|^2_Q + \| \begin{bmatrix}q\cr v\cr a_t \cr T\cr w\end{bmatrix} - \begin{bmatrix}q_{ref}\cr v_{ref} \cr 0\cr T_{ref}\cr w_{ref}\end{bmatrix} \|^2_I + q^T\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} \\
+$$\begin{flalign}&=\sum_{k=1}^N\| \begin{bmatrix}p_x\cr p_y\cr p_z\cr t\cr v_t\end{bmatrix} - \begin{bmatrix}0\cr 0 \cr 0\cr 0\cr 0\end{bmatrix} \|^2_Q + \| \begin{bmatrix}q\cr v\cr a_t \cr T\cr w\end{bmatrix} - \begin{bmatrix}q_{ref}\cr v_{ref} \cr 0\cr T_{ref}\cr w_{ref}\end{bmatrix} \|^2_I + q^T\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} \\
 &=\sum_{k=1}^N\| h(x_k, u_k) - \bar{y_k}\|^2_W+\textbf{Wlx}^Tx_k \ \text{(linear term)} \tag*{(ACADO p.103)}\\
-s.t & \ \ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix}, Q=\begin{bmatrix}1 & 0 & 0 & -v_{ref.x}(\theta)\cr 0 & 1 & 0 & -v_{ref.y}(\theta)\cr 0 & 0 & 1 & -v_{ref.z}(\theta) \cr -v_{ref.x}(\theta) & -v_{ref.y}(\theta) & -v_{ref.z}(\theta) & \sum v_{ref}(\theta)^2\end{bmatrix},\ q=\begin{bmatrix}2(-p_{ref.x}(\theta)+v_{ref.x}(\theta)\cdot \theta)\cr 2(-p_{ref.y}(\theta)+v_{ref.y}(\theta)\cdot \theta)\cr 2(-p_{ref.z}(\theta)+v_{ref.z}(\theta)\cdot \theta)\cr -2\sum v_{ref}(\theta)(-p_{ref}(\theta)+v_{ref}(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T\end{align}$$
+s.t & \ \ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix}, Q=\begin{bmatrix}1 & 0 & 0 & -v_{ref.x}(\theta)\cr 0 & 1 & 0 & -v_{ref.y}(\theta)\cr 0 & 0 & 1 & -v_{ref.z}(\theta) \cr -v_{ref.x}(\theta) & -v_{ref.y}(\theta) & -v_{ref.z}(\theta) & \sum v_{ref}(\theta)^2\end{bmatrix},\ q=\begin{bmatrix}2(-p_{ref.x}(\theta)+v_{ref.x}(\theta)\cdot \theta)\cr 2(-p_{ref.y}(\theta)+v_{ref.y}(\theta)\cdot \theta)\cr 2(-p_{ref.z}(\theta)+v_{ref.z}(\theta)\cdot \theta)\cr -2\sum v_{ref}(\theta)(-p_{ref}(\theta)+v_{ref}(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T\end{flalign}$$
 
 **The states and inputs**
 
