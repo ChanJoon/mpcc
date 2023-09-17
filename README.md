@@ -2,10 +2,10 @@
 
 ### Demos
 
-| <img src="images/iris_test.gif" alt="Iris with mpc_test.launch" width="500"/> | <img src="images/h480_test.gif" alt="Typhoon_h480 with mpc_test.launch" width="500"/> |
+| <img src="images/iris_test.gif" alt="Iris with mpc_test.launch" width="480"/> | <img src="images/h480_test.gif" alt="Typhoon_h480 with mpc_test.launch" width="480"/> |
 |:--:|:--:|
 |**Iris with mpc_test.launch**|**Typhoon_h480 with mpc_test.launch**|
-| <img src="images/h480_kepco_test.gif" alt="Typhoon_h480 with mpc_kepco_test.launch" width="500"/> |
+| <img src="images/h480_kepco_test.gif" alt="Typhoon_h480 with mpc_kepco_test.launch" width="480"/> |
 |**Typhoon_h480 with mpc_kepco_test.launch**|
 
 ### Updates
@@ -13,7 +13,7 @@
   - [mpc_wrapper.cpp](src/mpc_wrapper.cpp):
     - 아래 디버깅 파트 설명 중 qpOASES에서 31을 반환하여, quadratic form의 일부 state와 input에 weight를 1로 두었다. 이렇게 되면  $q^2, v^2$으로 들어가 Cost function과 맞지 않음.
     - 그래서 `acado_reference_state_`를 모두 0으로 하지 않고 $[q_w, q_x, q_y, q_z, v_x, v_y, v_z, a_t \|T, w_x, w_y, w_z]$에는 값을 넣어줌.
-    - Cost function에서 사용하는 $\|\begin{bmatrix}p_x\cr p_y\cr p_z\cr t\cr v_t\end{bmatrix}-\begin{bmatrix}0\cr 0\cr 0\cr 0\cr 0\end{bmatrix}\|$에는 $W$가 적용되고, 나머지에는 1로 weight 적용됨.
+    - Cost function에서 사용하는 $`\|\begin{bmatrix}p_x\cr p_y\cr p_z\cr t\cr v_t\end{bmatrix}-\begin{bmatrix}0\cr 0\cr 0\cr 0\cr 0\end{bmatrix}\|`$에는 $W$가 적용되고, 나머지에는 1로 weight 적용됨.
 - 23-09-14
   - [acado 메뉴얼](https://acado.sourceforge.net/doc/pdf/acado_manual.pdf) p.103-105에 따라 `acado model`, `mpc_wrapper`, `mpc_test` 파일 모두 수정
     - [quadrotor_model_thrustrates.cpp](model/quadrotor_model_thrustrates.cpp):
@@ -86,22 +86,21 @@
 
 ### Cost function 
 
-$$\begin{align}J&=\sum_{k=1}^N\{(\mu^{(k)}-\mu_p(t^{(k)}))^2-\rho\cdot v_t^{(k)}\}\\
-&=\sum_{k=1}^N\{(\mu^{(k)}-\mu_p(\theta^{(k)})-v_p(\theta^{(k)})\cdot (t^{(k)}-\theta^{(k)}))^2-\rho\cdot v_t^{(k)}\}\\
-&=\sum_{k=1}^N\begin{bmatrix}\mu\cr t\end{bmatrix}^T
-\begin{bmatrix}1 & -v_p(\theta)\cr -v_p(\theta)&v_p^2(\theta)\end{bmatrix}
-\begin{bmatrix}\mu\cr t\end{bmatrix}
-+\begin{bmatrix}2(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\cr -2v_p(\theta)(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T
-\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix}\end{align}$$
+$$\begin{align}J&=\sum_{k=1}^N\{\sum_{\mu=x,y,z}(\mu^{(k)}-\mu_p(t^{(k)}))^2-\rho\cdot v_t^{(k)}\}\\
+&=\sum_{k=1}^N\{\sum_{\mu=x,y,z}(\mu^{(k)}-\mu_p(\theta^{(k)})-v_p(\theta^{(k)})\cdot (t^{(k)}-\theta^{(k)}))^2-\rho\cdot v_t^{(k)}\}\\
+&\text{omit time step (k) for readability}\\
+&=\sum_{k=1}^N\begin{bmatrix}p_x\cr p_z\cr p_z\cr t\end{bmatrix}^T
+\begin{bmatrix}1 & 0 & 0 & -v_{ref.x}(\theta)\cr 0 & 1 & 0 & -v_{ref.y}(\theta)\cr 0 & 0 & 1 & -v_{ref.z}(\theta) \cr -v_{ref.x}(\theta) & -v_{ref.y}(\theta) & -v_{ref.z}(\theta) & \sum v_{ref}(\theta)^2\end{bmatrix}
+\begin{bmatrix}p_x\cr p_z\cr p_z\cr t\end{bmatrix}
++\begin{bmatrix}2(-p_{ref.x}(\theta)+v_{ref.x}(\theta)\cdot \theta)\cr 2(-p_{ref.y}(\theta)+v_{ref.y}(\theta)\cdot \theta)\cr 2(-p_{ref.z}(\theta)+v_{ref.z}(\theta)\cdot \theta)\cr -2\sum v_{ref}(\theta)(-p_{ref}(\theta)+v_{ref}(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T
+\begin{bmatrix}p_x\cr p_z\cr p_z\cr t\cr v_t\end{bmatrix}\end{align}$$
 
 ---
-*Convert quadratic form(OSQP) to a weighted $l_2$-norm(ACADO)*
+*Convert quadratic form(OSQP) to a weighted $`l_2`$-norm(ACADO)*
 
-$$\begin{align}&=\sum_{k=1}^N\|W^{1/2}\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix}\|^2+q^T
-\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix}\\
-&=\sum_{k=1}^N\| \begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} - \begin{bmatrix}0\cr 0 \cr 0\end{bmatrix} \|^2_W+q^T\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} \\
+$$\begin{align}&=\sum_{k=1}^N\| \begin{bmatrix}p_x\cr p_y\cr p_z\cr t\cr v_t\end{bmatrix} - \begin{bmatrix}0\cr 0 \cr 0\cr 0\cr 0\end{bmatrix} \|^2_Q + \| \begin{bmatrix}q\cr v\cr a_t \cr T\cr w\end{bmatrix} - \begin{bmatrix}q_{ref}\cr v_{ref} \cr 0\cr T_{ref}\cr w_{ref}\end{bmatrix} \|^2_I + q^T\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} \\
 &=\sum_{k=1}^N\| h(x_k, u_k) - \bar{y_k}\|^2_W+\textbf{Wlx}^Tx_k \ \text{(linear term)} \tag*{(ACADO p.103)}\\
-s.t & \ \ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix} W=\begin{bmatrix}1 & -v_p(\theta)\cr -v_p(\theta)&v_p^2(\theta)\end{bmatrix},\ q=\begin{bmatrix}2(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\cr -2v_p(\theta)(-\mu_p(\theta)+v_p(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T\end{align}$$
+s.t & \ \ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix}, Q=\begin{bmatrix}1 & 0 & 0 & -v_{ref.x}(\theta)\cr 0 & 1 & 0 & -v_{ref.y}(\theta)\cr 0 & 0 & 1 & -v_{ref.z}(\theta) \cr -v_{ref.x}(\theta) & -v_{ref.y}(\theta) & -v_{ref.z}(\theta) & \sum v_{ref}(\theta)^2\end{bmatrix},\ q=\begin{bmatrix}2(-p_{ref.x}(\theta)+v_{ref.x}(\theta)\cdot \theta)\cr 2(-p_{ref.y}(\theta)+v_{ref.y}(\theta)\cdot \theta)\cr 2(-p_{ref.z}(\theta)+v_{ref.z}(\theta)\cdot \theta)\cr -2\sum v_{ref}(\theta)(-p_{ref}(\theta)+v_{ref}(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T\end{align}$$
 
 **The states and inputs**
 
