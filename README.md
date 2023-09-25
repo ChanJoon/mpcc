@@ -4,13 +4,13 @@
 
 (updated on 09/26)
 
-| <img src="images/mpcc_iris_0926.gif" alt="Iris (No Wind)" width="330" /> | <img src="images/mpcc_iris_wind_0926.gif" alt="Iris (Wind)" width="330" /> | <img src="images/mpcc_iris_wind_L1_0926.gif" alt="Iris (Wind+L1)" width="330" /> |
+| <img src="images/mpcc_iris_0926.gif" alt="Iris (No Wind)"  /> | <img src="images/mpcc_iris_wind_0926.gif" alt="Iris (Wind)"  /> | <img src="images/mpcc_iris_wind_L1_0926.gif" alt="Iris (Wind+L1)"  /> |
 |:--:|:--:|:--:|
 |**Iris (No Wind)**|**Iris (Wind)**|**Iris (Wind+L1)**|
-| <img src="images/mpcc_typhoon_0926.gif" alt="Typhoon (No Wind)" width="330"/> | <img src="images/mpcc_typhoon_wind_0926.gif" alt="Typhoon (Wind)" width="330"/> | <img src="images/mpcc_typhoon_wind_L1_0926.gif" alt="Typhoon (Wind+L1)" width="330"/> |
-|**Typhoon (No Wind)**|**Typhoon (Wind)**|**Typhoon (Wind+L1)**|
+| <img src="images/mpcc_typhoon_0926.gif" alt="Typhoon (No Wind)" /> | <img src="images/mpcc_typhoon_wind_0926.gif" alt="Typhoon (Wind)" /> | <img src="images/mpcc_typhoon_wind_L1_0926.gif" alt="Typhoon (Wind+L1)" /> |
+|**Typhoon (No Wind) x4**|**Typhoon (Wind) x4**|**Typhoon (Wind+L1) x4**|
 |<img src="images/mpcc_typhoon_fail_0926.gif" alt="Typhoon (Fail)" />|
-|**Typhoon with mpc_kepco_test.launch**|
+|**Typhoon with mpc_kepco_test x4**|
 
 ### Usage
 Iris
@@ -114,6 +114,7 @@ roslaunch mpcc mpc_kepco_test.launch
   - [x] : Fix weight matrices to have dynamic costs according to $\theta^{(k)}$
   - [x] : To find out $\theta^{(k)}$, generate the bezier curve path using */target traj*
   - [ ] : Apply 0 weight to $q$ or $v$ if possible
+  - [ ] : test mpcc on lemniscate trajectory
   - [ ] : Refactoring
 
 ### Cost function 
