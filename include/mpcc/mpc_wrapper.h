@@ -58,14 +58,19 @@ class MpcWrapper
 
   MpcWrapper();
   MpcWrapper(
-    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kStateSize>> Q,
+    // const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kStateSize>> Q,
+    // const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kInputSize>> R,
+    // const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> q);
+    const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize * kSamples>> Q,
     const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kInputSize>> R,
-    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> q);
+    const Eigen::Ref<const Eigen::Matrix<T, kStateSize*(kSamples+1), 1, Eigen::ColMajor>> q);
 
   bool setCosts(
-    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kStateSize>> Q,
+    // const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kStateSize>> Q,
+    const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize * kSamples>> Q,
     const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kInputSize>> R,
-    const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> q,
+    // const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> q,
+    const Eigen::Ref<const Eigen::Matrix<T, kStateSize*(kSamples+1), 1, Eigen::ColMajor>> q,
     const T state_cost_scaling = 0.0, const T input_cost_scaling = 0.0);
 
   bool setLimits(T min_thrust, T max_thrust,
@@ -94,7 +99,6 @@ class MpcWrapper
   void getInputs(
     Eigen::Ref<Eigen::Matrix<T, kInputSize, kSamples>> return_input);
   T getTimestep() { return dt_; }
-  void getVerbose();
 
  private:
   Eigen::Map<Eigen::Matrix<float, kRefSize, kSamples, Eigen::ColMajor>>

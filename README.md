@@ -2,19 +2,47 @@
 
 ### Demos
 
-| <img src="images/iris_test.gif" alt="Iris with mpc_test.launch" width="480"/> | <img src="images/h480_test.gif" alt="Typhoon_h480 with mpc_test.launch" width="480"/> |
-|:--:|:--:|
-|**Iris with mpc_test.launch**|**Typhoon_h480 with mpc_test.launch**|
-| <img src="images/h480_kepco_test.gif" alt="Typhoon_h480 with mpc_kepco_test.launch" width="480"/> |
-|**Typhoon_h480 with mpc_kepco_test.launch**|
+(updated on 09/26)
+
+| <img src="images/mpcc_iris_0926.gif" alt="Iris (No Wind)" width="330" /> | <img src="images/mpcc_iris_wind_0926.gif" alt="Iris (Wind)" width="330" /> | <img src="images/mpcc_iris_wind_L1_0926.gif" alt="Iris (Wind+L1)" width="330" /> |
+|:--:|:--:|:--:|
+|**Iris (No Wind)**|**Iris (Wind)**|**Iris (Wind+L1)**|
+| <img src="images/mpcc_typhoon_0926.gif" alt="Typhoon (No Wind)" width="330"/> | <img src="images/mpcc_typhoon_wind_0926.gif" alt="Typhoon (Wind)" width="330"/> | <img src="images/mpcc_typhoon_wind_L1_0926.gif" alt="Typhoon (Wind+L1)" width="330"/> |
+|**Typhoon (No Wind)**|**Typhoon (Wind)**|**Typhoon (Wind+L1)**|
+|<img src="images/mpcc_typhoon_fail_0926.gif" alt="Typhoon (Fail)" />|
+|**Typhoon with mpc_kepco_test.launch**|
+
+### Usage
+Iris
+```bash
+roslaunch mpcc quadrotor_gazebo.launch #gui:=false
+rosrun mpcc test_circle.py # or test_lemniscate.py
+roslaunch mpcc mpc_test.launch
+```
+Typhoon_h480
+```bash
+roslaunch gazebo_test.launch
+rosrun mpcc test_circle.py # or test_lemniscate.py
+roslaunch mpcc mpc_kepco_test.launch
+```
 
 ### Updates
-- 23-09-16
+- **23-09-26**
+  - [bezier_curve.h](include/mpcc/bezier_curve.h): 경로점 6개를 받아 5차 베지어 커브를 생성
+  - [bezier_curve_test.h](include/mpcc/bezier_curve_test.h): `nav_msgs/Path` 콜백함수으로 베지어 경로를 생성하고 다시 `Path`로 생성. `bezier_curve.h` 디버깅을 위한 테스트 코드
+  - [mpc_test.h](include/mpcc/mpc_test.h):
+    - `target_traj_cb`에서 `bezier_curve.h`로 경로점 6개 넘겨주도록 수정
+    - `reference_states_`에서 `t`에 ros::Duration으로 dt 더해줌. `vt`는 1로 수정
+    - `set_params()`에서 W, Wlx를 $\theta^{(N)}$까지 dynamic하게 들어가도록 수정
+  - [mpc_wrapper.cpp](src/mpc_wrapper.cpp): 이에 맞게 `setCosts` 수정
+  - 추후 코드 리팩토링 필요 (kSamples 루프가 mpc_test와 mpc_wrapper에서 2번 돌고 있음)
+
+- **23-09-16**
   - [mpc_wrapper.cpp](src/mpc_wrapper.cpp):
     - 아래 디버깅 파트 설명 중 qpOASES에서 31을 반환하여, quadratic form의 일부 state와 input에 weight를 1로 두었다. 이렇게 되면  $q^2, v^2$으로 들어가 Cost function과 맞지 않음.
     - 그래서 `acado_reference_state_`를 모두 0으로 하지 않고 $[q_w, q_x, q_y, q_z, v_x, v_y, v_z, a_t \|T, w_x, w_y, w_z]$에는 값을 넣어줌.
     - Cost function에서 사용하는 $`\|\begin{bmatrix}p_x\cr p_y\cr p_z\cr t\cr v_t\end{bmatrix}-\begin{bmatrix}0\cr 0\cr 0\cr 0\cr 0\end{bmatrix}\|`$에는 $W$가 적용되고, 나머지에는 1로 weight 적용됨.
-- 23-09-14
+- **23-09-14**
   - [acado 메뉴얼](https://acado.sourceforge.net/doc/pdf/acado_manual.pdf) p.103-105에 따라 `acado model`, `mpc_wrapper`, `mpc_test` 파일 모두 수정
     - [quadrotor_model_thrustrates.cpp](model/quadrotor_model_thrustrates.cpp):
       - 기존 MPC처럼 `h`, `hN`을 각각 state+input, state 벡터로 변경해줌. (메뉴얼 p.105 참고)
@@ -29,12 +57,12 @@
     - 따라서, $[p_x, p_y, p_z, t, v_t]$를 제외한 state와 input은 weight를 1로 넣어줌.
     - `t`,`vt`,`at` 쪽은 출력으로 확인해보니 ros Time에서 seconds로 바뀌면서 전체 horizon `N`에 대해 같은 값을 가지고 있음. `est_state_`나 `predicted_states_`의 값이 적절해보이고, ODE모델에서 다른 state나 input에 영향이 없으므로 현재 문제의 원인으로는 고려 X. 추후 수정 필요해보임.
     - $l_2$-norm 의 weight matrix `W`에 0을 넣으면 문제가 생기는 것은 파악했으나, `Wlx`가 어떤 식으로 사용되는지 명확하지 않아 확인이 필요함.
-- 23-09-12
+- **23-09-12**
   - 기존 Cost function을 quadratic form 에서 $l_2$-norm으로 바꿔줌. OSQP에서는 Reference에 해당하는 부분을 $x^TQx+q^Tx$의 $Q, q$에 넣어주었지만, ACADO에서는 별도로 reference state가 주어진다. 따라서 *acadoVariables.y*에는 0을 넣어주고 weight matrix를 그대로 사용하고자 함.
   - Gazebo 테스트 중 비정상적으로 비행하여서, 출력문을 통해 디버깅 중.
   - acado_inputs에 값이 정상적으로 변하지 않아 acado_feedbackStep() returnValue로 원인 파악 중.
   - *acadoVariables.y*를 기존 MPC처럼 state+input으로 변경해주어야 할 것으로 보임.
-- 23-09-07
+- **23-09-07**
   - `acado_Wlx`가 $`273*1`$의 column vector, `mpc_wrapper`의 `Wlx_`는 $13*1$의 column vector이므로 `Eigen::Matrix<T, kStateSize, kStateSize> R` 과 `R_`을 Matrix에서 Vector로 수정.(`kStateSize x (kSamples+1) = 273`)
   - CMPCC를 참고하여 `set_state_est`, `set_params`와 `solve_mpc` 수정.
   - `est_state_`의 `vt`, `at`를 이전 결과로부터 가져오도록 수정. 우선, `solve_from_scratch_` 조건문에 update되는 부분을 넣음. 추후 필요시 리팩토링
@@ -52,7 +80,7 @@
     ```
   - `est_state`에서 `t`에 해당하는 부분을 odom의 `timestamp`로 함. `reference_states_`의 `t`를 `target_traj`의 `timestamp`로 하여 같은 타임라인 간의 차이로 생각하여 이렇게 하였으나 추후 문제 시 수정해야함.
   - `mpc_wrapper`에서 잘못된 부분들 일부 수정.(자세한 내용은 commit 내용 확인)
-- 23-08-31
+- **23-08-31**
   - [quadrotor_model_thrustrates.cpp](model/quadrotor_model_thrustrates.cpp): $-\rho\cdot v_t$를 추가하고 이를 `mpc_wrapper`에 반영 (`acadoVariables.Wlx, Wlu`)
   - [mpc_wrapper.h](include/mpcc/mpc_wrapper.h): `kHoverInput_`을 바뀐 모델에 맞게 초기화 ($t_0, v_{t0}, a_{t0}, \bar{J_{t0}} = 0$)
   - [mpc_wrapper.cpp](src/mpc_wrapper.cpp): `
@@ -60,7 +88,7 @@
     - `setCosts`에서 linear weighting matrix `Wlx_`를 `R`로 할당하고 `R`을 `kStateSize`로 모두 수정. `Wlu_`는 사용 X. (i.e. $x^TQx+R^Tx$)
     - `setTrajectory`에서 `states_`를 `kRefSize`만큼 `acado_reference_states_` 할당. `setReferencePose`는 `mpc_test.h`에서 사용하지 않으므로 일단 변경 X.
 
-- 23-08-26
+- **23-08-26**
   - [quadrotor_model_thrustrates.cpp](model/quadrotor_model_thrustrates.cpp): CMPCC $x^TQx$ 부분 반영(아래 cost function 참조)
   - [mpc_wrapper](include/mpcc/mpc_wrapper.h):
     - sh_mpc에서는 `kRefSize` = `kStateSize` + `kInputSize` 이고, `kCostSize`는 hN 함수에 대한 cost weigt matrix dimension으로 사용됨. 현재 mpcc acado 모델에서는 `kRefSize`=5 < `kStateSize`=13 이므로 kCostSize를 제거하거나 맞게 변경함.
@@ -78,11 +106,15 @@
   - [x] : `setReferencePose`, `setTrajectory`, `update`
   - [x] : Cost weight matrix `acado_W_` and `acado_W_end_` should be assigned dynamically in ~~`setCosts`~~, `set_params`
   - [x] : Modify `est_state_`, `reference_states_` with reference to CMPCC(*Update some states from last horizon*)
-  - [ ] : ~~Implement `findNearestTheta` and `getGlobalCommand`~~ (Currently using target topics)
+  - [x] : ~~Implement `findNearestTheta` and `getGlobalCommand`~~ (Currently using target topics)
   - [x] : Fix `NaN` values from `predicted_states_(STATE::kVelT, 1)` and `(State::kAccT)`
   - [x] : Test roslaunch and parameter tuning
   - [x] : Fix unstable preicted trajectory and control inputs
-  - [ ] : Figure out how `Wlx` works in acado
+  - [x] : Figure out how `Wlx` works in acado
+  - [x] : Fix weight matrices to have dynamic costs according to $\theta^{(k)}$
+  - [x] : To find out $\theta^{(k)}$, generate the bezier curve path using */target traj*
+  - [ ] : Apply 0 weight to $q$ or $v$ if possible
+  - [ ] : Refactoring
 
 ### Cost function 
 

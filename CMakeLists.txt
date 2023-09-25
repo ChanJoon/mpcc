@@ -101,3 +101,9 @@ cs_add_executable(wind_node
 
 cs_install()
 cs_export()
+
+cs_add_executable(bezier_node
+ src/bezier_curve_test.cpp)
+
+cs_install()
+cs_export()

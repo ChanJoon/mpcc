@@ -43,6 +43,7 @@
 
 // MPC
 #include "mpcc/mpc_wrapper.h"
+#include "mpcc/bezier_curve.h"
 
 using namespace std;
 using namespace std::chrono;
@@ -79,7 +80,7 @@ class MPCC{
 		double ctrl_hz, m_cutoff_hz, um_cutoff_hz;
 		double thrust_const, thrust_offset, max_thrust, min_thrust, K_adaacc;
 		double As_1,	As_2, As_3, As_4, As_5, As_6;
-		double theta_max, rho;
+		double rho;
 
 		bool state_check = false, target_check = false, L1_start = false;
 		bool ctrl_init = false, L1_on = false, debug = false;
@@ -94,6 +95,12 @@ class MPCC{
 		Vector4d att, t_att;
 
 		nav_msgs::Path target_traj;
+
+		// Bezier
+		BEZIER bezier;
+		Matrix<double, 3, 6> points;
+		Matrix<double, 3, kSamples> bezier_points;
+		Matrix<double, 3, kSamples> bezier_vel;
 
 		// L1 adaptive control
 		Vector3d L1_vel_error, L1_ang_error;
@@ -121,9 +128,13 @@ class MPCC{
 		Matrix<double, kInputSize, kSamples + 1> reference_inputs_;
 		Matrix<double, kStateSize, kSamples + 1> predicted_states_;
 		Matrix<double, kInputSize, kSamples> predicted_inputs_;
-		Matrix<double, kStateSize, kStateSize> Q_;
+		Matrix<double, kStateSize, 1> predicted_state_i;
+		// Matrix<double, kStateSize, kStateSize> Q_;
+		Matrix<double, kRefSize, kRefSize * kSamples> Q_;
 		Matrix<double, kInputSize, kInputSize> R_;
-		Matrix<double, kStateSize, 1> q_;
+		// Matrix<double, kStateSize, 1> q_;
+		Matrix<double, kStateSize*(kSamples+1), 1, ColMajor> q_;
+		Matrix<double, kStateSize, 1> q_tmp;
 		Matrix<double, kStateSize, 1> grad_x;
 		Matrix<double, kStateSize, 1> grad_y;
 		Matrix<double, kStateSize, 1> grad_z;
@@ -152,8 +163,6 @@ class MPCC{
 		void preparationThread();
 		bool set_params();
 		bool set_state_est();
-		// Find nearest theta of global trajectory
-		double findNearestTheta(Vector3d position);
 		bool pub_predict(
 		const Ref<const Matrix<double, kStateSize, kSamples + 1>> states,
 		const Ref<const Matrix<double, kInputSize, kSamples>> inputs,
@@ -198,9 +207,7 @@ class MPCC{
 			nh.param("/K_adaacc", K_adaacc, 1.0);
 			nh.param("/L1_on", L1_on, true);
 			nh.param("/debug", debug, true);
-			// Refer to qVTheta
-			// https://github.com/ZJU-FAST-Lab/CMPCC/blob/master/src/cmpcc/config/mpcParameters.yaml
-			nh.param("/rho", rho, 0.005);
+			nh.param("/rho", rho, 0.005);		// a weight of
 
 			// publishers
 			m_pos_ctrl_pub = nh.advertise<geometry_msgs::PoseStamped>("/mavros/setpoint_position/local", 3);
@@ -234,7 +241,6 @@ void MPCC::state_cb(const mavros_msgs::State::ConstPtr& msg){
 
 void MPCC::odom_cb(const nav_msgs::Odometry::ConstPtr& msg){
 	dt_odom = (msg->header.stamp - t_odom).toSec();
-	// pos, att, vel이 들어간 시점 t_odom
 	t_odom = msg->header.stamp;
 	pos << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
 	att << msg->pose.pose.orientation.w, msg->pose.pose.orientation.x, 
@@ -282,7 +288,16 @@ void MPCC::target_cb(const nav_msgs::Odometry::ConstPtr& msg){
 
 void MPCC::target_traj_cb(const nav_msgs::Path::ConstPtr& msg){
 	target_traj = *msg;
-	theta_max = target_traj.poses[0].header.stamp.toSec();
+	int total_poses = target_traj.poses.size();
+	int s = (total_poses - 1) / bezier.traj_order; // interval
+
+	for(int i = 0; i < bezier.traj_order+1; ++i) {
+		points(0, i) = target_traj.poses[i * s].pose.position.x;
+		points(1, i) = target_traj.poses[i * s].pose.position.y;
+		points(2, i) = target_traj.poses[i * s].pose.position.z;
+	}
+
+	bezier.calculateBezierCurve(points);
 }
 
 void MPCC::control_timer_func(const ros::TimerEvent& event){
@@ -319,9 +334,6 @@ void MPCC::control_timer_func(const ros::TimerEvent& event){
 						preparation_ = true;
 					}
 					pub_cmd();
-				}
-				if(curr_state.mode != "OFFBOARD"){
-					mpc_wrapper_.getVerbose();
 				}
 				return;
 			}
@@ -385,16 +397,14 @@ void MPCC::solve_mpc(){
 	set_state_est();
 
 	// Approximate est_state_
-	// MEMO: CMPCC에서는 근사하고 last horizon에서 update해야 하는 부분은 새로 업데이트 한다. set_state_est()에서 어느 부분까지 가져올지 결정해야 함.
-	// CMPCC에서는 solve한 state의 t=0, t=1을 가져와서 callback이 발생한 시점과 연산하는 시점을 이용해 근사함. 그 후, t=1의 값을 가져와 t, vt, at 등을 update함.
-	// 여기서는 callback이 발생하는 시점이나, 근사를 사용하지 않고 있음. 동일하게 할 거라면 update만 하면된다.
-	// 따라서 아래 부분을 없애고, set_state_est()에서 mpc_wrapper의 t=1 부분을 가져오면 된다.
+	// TODO: CMPCC에서는 근사하고 last horizon에서 update해야 하는 부분은 새로 업데이트 한다. set_state_est()에서 어느 부분까지 가져올지 결정해야 함.
 	// t_state = ros::Time::now();
 	// est_state_ = (est_state_ - est_state_prev)/dt_odom*(t_state-t_odom).toSec() + est_state_;
 
 	// setReference(reference_trajectory);
 	reference_inputs_.setZero();
 	reference_states_.setZero();
+	clock_t dt = mpc_wrapper_.getTimestep();
 	for (int i = 0; i < kSamples + 1; i++){
 		reference_states_(0, i) = target_traj.poses[i].pose.position.x;
 		reference_states_(1, i) = target_traj.poses[i].pose.position.y;
@@ -406,9 +416,8 @@ void MPCC::solve_mpc(){
 		reference_states_(7, i) = t_vel(0);
 		reference_states_(8, i) = t_vel(1);
 		reference_states_(9, i) = t_vel(2);
-		// TODO: What reference t, vt, at will be in i to kSamples? dt = 0.5
-		reference_states_(10, i) = target_traj.poses[i].header.stamp.toSec();				// t
-		reference_states_(11, i) = 0;				// vt
+		reference_states_(10, i) = (target_traj.poses[i].header.stamp + ros::Duration(i * dt)).toSec();				// t
+		reference_states_(11, i) = 1;				// vt
 		reference_states_(12, i) = 0;				// at
 
 		reference_inputs_(0, i) = 9.8066;	// T
@@ -416,7 +425,6 @@ void MPCC::solve_mpc(){
 		reference_inputs_(2, i) = 0;			// w_y
 		reference_inputs_(3, i) = 0;			// w_z
 		reference_inputs_(4, i) = 0;			// jt
-		theta_max += target_traj.poses[i].header.stamp.toSec();
 	}
 	// Get the feedback from MPC.
 	mpc_wrapper_.setTrajectory(reference_states_, reference_inputs_);
@@ -429,7 +437,6 @@ void MPCC::solve_mpc(){
 		mpc_wrapper_.solve(est_state_);
 		solve_from_scratch_ = false;
 	} else {
-		// TODO: Refactoring
 		est_state_(STATE::kVelT) = predicted_states_(STATE::kVelT, 1);
 		est_state_(STATE::kAccT) = predicted_states_(STATE::kAccT, 1);
 		mpc_wrapper_.update(est_state_, do_preparation_step);
@@ -438,12 +445,6 @@ void MPCC::solve_mpc(){
 	mpc_wrapper_.getInputs(predicted_inputs_);
 
 	if(debug){
-		// std::cout << "est_state_ " << std::endl;
-		// std::cout << est_state_ << std::endl;
-		// std::cout << "predicted_states_ " << std::endl;
-		// std::cout << predicted_states_.col(0) << std::endl;
-		// std::cout << "predicted_inputs_ " << std::endl;
-		// std::cout << predicted_inputs_.col(0) << std::endl;
 		pub_predict(predicted_states_, predicted_inputs_, call_time);
 	}
 
@@ -481,62 +482,64 @@ void MPCC::preparationThread() {
 }
 
 bool MPCC::set_params() {
+	Q_.setZero();
+	q_.setZero();
 	grad_x.setZero();
 	grad_y.setZero();
 	grad_z.setZero();
 
-	double theta = 0.0;
-	if (solve_from_scratch_) {
-		theta = ctrl_start_time.toSec();
-	}
-	else {
-		theta = est_state_(STATE::kTime);
-	}
-	// std::cout << "theta " << theta << std::endl;
-	// TODO: getGlobalCommand(theta, pos, vel);
-	// 우선 pos(theta), vel(theta) 대신 target_odom callback에서 받은 변수로 대체
-	// CMPCC에서는 최대 global_traj_time과 theta를 std::fmod로 [0, max_theta)로 mapping
-	// 그 후 global_traj로 theta에 해당하는 pos, vel을 얻어냄.
-	double x_v = t_pos(0);
-	double y_v = t_pos(1);
-	double z_v = t_pos(2);
-	double dx_v__dtheta = t_vel(0);
-	double dy_v__dtheta = t_vel(1);
-	double dz_v__dtheta = t_vel(2);
-	double r_x = x_v - dx_v__dtheta * theta;
-	double r_y = y_v - dy_v__dtheta * theta;
-	double r_z = z_v - dz_v__dtheta * theta;
-	grad_x.coeffRef(0, 0) = 1;
-	grad_y.coeffRef(1, 0) = 1;
-	grad_z.coeffRef(2, 0) = 1;
-	grad_x.coeffRef(10, 0) = -dx_v__dtheta;
-	grad_y.coeffRef(10, 0) = -dy_v__dtheta;
-	grad_z.coeffRef(10, 0) = -dz_v__dtheta;
-	Matrix<double, kStateSize, kStateSize> Q_tmp = 
-				grad_x * grad_x.transpose() + 
-				grad_y * grad_y.transpose() + 
-				grad_z * grad_z.transpose();
+	bezier.getPos(bezier_points);
+	bezier.getVel(bezier_vel);
 
-	Q_ = Q_tmp;
+	double theta = 0.0;
+	for (int i = 0; i < kSamples; i++) {
+		if (solve_from_scratch_) {
+			theta = ctrl_start_time.toSec();
+		}
+		else {
+			mpc_wrapper_.getState(i, predicted_state_i);
+			theta = predicted_state_i(STATE::kTime, 0);
+		}
+		double x_v = bezier_points(0, i);
+		double y_v = bezier_points(1, i);
+		double z_v = bezier_points(2, i);
+		double dx_v__dtheta = bezier_vel(0, i);
+		double dy_v__dtheta = bezier_vel(1, i);
+		double dz_v__dtheta = bezier_vel(2, i);
+		double r_x = x_v - dx_v__dtheta * theta;
+		double r_y = y_v - dy_v__dtheta * theta;
+		double r_z = z_v - dz_v__dtheta * theta;
+
+		grad_x.coeffRef(0, 0) = 1;
+		grad_y.coeffRef(1, 0) = 1;
+		grad_z.coeffRef(2, 0) = 1;
+		grad_x.coeffRef(10, 0) = -dx_v__dtheta;
+		grad_y.coeffRef(10, 0) = -dy_v__dtheta;
+		grad_z.coeffRef(10, 0) = -dz_v__dtheta;
+
+		Matrix<double, kStateSize, kStateSize> Q_tmp = 
+					grad_x * grad_x.transpose() + 
+					grad_y * grad_y.transpose() + 
+					grad_z * grad_z.transpose();
+		Q_tmp.block(3, 3, 10, 10) = Matrix<double, 10, 10>::Identity();
+
+		Q_.block(0, i * kRefSize, kStateSize, kStateSize) =
+			Q_tmp.block(0, 0, kStateSize, kStateSize);
+
+		q_tmp = -r_x*grad_x - r_y*grad_y - r_z*grad_z;
+		q_tmp.coeffRef(11, 0) = -rho;
+
+		q_.block(i * kStateSize, 0, kStateSize, 1) =
+			q_tmp;
+	}
 	// Q_.block(3, 3, 7, 7) = (Matrix<double, 7, 1>() <<
 			// Q_attitude_, Q_attitude_, Q_attitude_, Q_attitude_,
 			// Q_velocity_, Q_velocity_, Q_velocity_
 			// ).finished().asDiagonal();
-	// Q_.coeffRef(kStateSize-2, kStateSize-2) = 1;
-	// Q_.coeffRef(kStateSize-1, kStateSize-1) = 1;
-	Q_.block(3, 3, 10, 10) = Matrix<double, 10, 10>::Identity();
-
 
 	R_.setIdentity();
 	// R_ = (Matrix<double, kInputSize, 1>() << 
 			// R_thrust_, R_pitchroll_, R_pitchroll_, R_yaw_, 1.0).finished().asDiagonal();
-
-	q_ = -r_x*grad_x - r_y*grad_y - r_z*grad_z;
-	q_.coeffRef(11, 0) = -rho;
-
-	// std::cout << "Q_ [" << std::endl << Q_ << " ]" << std::endl;
-	// std::cout << "R_ [" << std::endl << R_ << " ]" << std::endl;
-	std::cout << "q_ [" << std::endl << q_ << " ]" << std::endl;
 
 	mpc_wrapper_.setCosts(Q_, R_, q_, state_cost_exponential_, input_cost_exponential_);
 	mpc_wrapper_.setLimits(
@@ -549,7 +552,6 @@ bool MPCC::set_params() {
 
 bool MPCC::set_state_est() {
 	est_state_prev = est_state_;
-	// est_state_value is what odom_cb received in t_odom
 	est_state_(STATE::kPosX) = pos(0);
 	est_state_(STATE::kPosY) = pos(1);
 	est_state_(STATE::kPosZ) = pos(2);
@@ -560,17 +562,10 @@ bool MPCC::set_state_est() {
 	est_state_(STATE::kVelX) = vel(0);
 	est_state_(STATE::kVelY) = vel(1);
 	est_state_(STATE::kVelZ) = vel(2);
-	//TODO: Implement a function finding nearest theta based on CMPCC
-	// est_state_(STATE::kTime) = findNearestTheta(t_pos);
 	est_state_(STATE::kTime) = t_odom.toSec();
 	est_state_(STATE::kVelT) = 0;
 	est_state_(STATE::kAccT) = 0;
 	return true;
-}
-
-double MPCC::findNearestTheta(Vector3d position) {
-	// TODO
-	return position.norm();
 }
 
 bool MPCC::pub_predict(

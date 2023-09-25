@@ -55,7 +55,7 @@ MpcWrapper<T>::MpcWrapper()
   
   for(int i = 0; i < kSamples+1; ++i){
     acado_states_(kStateSize-3, i) = i * dt_;
-    acado_states_(kStateSize-2, i) = 0.5;
+    acado_states_(kStateSize-2, i) = 1;
     acado_states_(kStateSize-1, i) = 0;
   }
 
@@ -65,13 +65,6 @@ MpcWrapper<T>::MpcWrapper()
   acado_reference_states_.setZero();
   // acado_reference_states_.block(0, 0, kStateSize-3, kSamples) =
   //   hover_state.replicate(1, kSamples).template cast<float>();
-
-  // //TODO t에 대한 initial 값을 어떻게 주면 될지? N = 20 dt = 0.1, t = 2
-  // for(int i = 0; i < kSamples; ++i){
-  //   acado_reference_states_(kStateSize-3, i) = i * dt_;
-  //   acado_reference_states_(kStateSize-2, i) = 0.5;
-  //   acado_reference_states_(kStateSize-1, i) = 0;
-  // }
 
   // acado_reference_states_.block(kStateSize, 0, kInputSize, kSamples) = 
   //   kHoverInput_.replicate(1, kSamples);
@@ -96,9 +89,9 @@ MpcWrapper<T>::MpcWrapper()
 // Constructor with cost matrices as arguments.
 template <typename T>
 MpcWrapper<T>::MpcWrapper(
-  const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kStateSize>> Q,
+  const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize * kSamples>> Q,
   const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kInputSize>> R,
-  const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> q)
+  const Eigen::Ref<const Eigen::Matrix<T, kStateSize*(kSamples+1), 1, Eigen::ColMajor>> q)
 {
   setCosts(Q, R, q);
   MpcWrapper();
@@ -107,9 +100,9 @@ MpcWrapper<T>::MpcWrapper(
 // Set cost matrices with optional scaling.
 template <typename T>
 bool MpcWrapper<T>::setCosts(
-  const Eigen::Ref<const Eigen::Matrix<T, kStateSize, kStateSize>> Q,
+  const Eigen::Ref<const Eigen::Matrix<T, kRefSize, kRefSize * kSamples>> Q,
   const Eigen::Ref<const Eigen::Matrix<T, kInputSize, kInputSize>> R,
-  const Eigen::Ref<const Eigen::Matrix<T, kStateSize, 1>> q,
+  const Eigen::Ref<const Eigen::Matrix<T, kStateSize*(kSamples+1), 1, Eigen::ColMajor>> q,
   const T state_cost_scaling, const T input_cost_scaling)
 {
   if(state_cost_scaling < 0.0 || input_cost_scaling < 0.0 )
@@ -117,41 +110,44 @@ bool MpcWrapper<T>::setCosts(
     ROS_ERROR("MPC: Cost scaling is wrong, must be non-negative!");
     return false;
   }
-  W_.block(0, 0, kStateSize, kStateSize) = Q;
+  // W_.block(0, 0, kStateSize, kStateSize) = Q;
   W_.block(kStateSize, kStateSize, kInputSize, kInputSize) = R;
 
-  Wlx_.block(0, 0, kStateSize, 1) = q;
+  // Wlx_.block(0, 0, kStateSize, 1) = q;
 
   WN_.setZero();
 
   float state_scale{1.0};
   float input_scale{1.0};
-  // Set cost matrix acadoVariables.W from k=0,1,...,N with scaled W_
+  // TODO
+  // pros. Scaling을 mpc_test에서 해주면 loop 적어짐
+  // cons. 대신 mpc_wrapper를 다른 쪽에서 쓸 수 없어짐. (wrapper 사용성 적어짐)
   for(int i=0; i<kSamples; i++)
   { 
     state_scale = exp(- float(i)/float(kSamples)
       * float(state_cost_scaling));
     input_scale = exp(- float(i)/float(kSamples)
       * float(input_cost_scaling));
+    // acado_W_.block(0, i * kRefSize, kStateSize, kStateSize) =
+      // W_.block(0, 0, kStateSize, kStateSize).template cast<float>()
+      // * state_scale;
     acado_W_.block(0, i * kRefSize, kStateSize, kStateSize) =
-      W_.block(0, 0, kStateSize, kStateSize).template cast<float>()
+      Q.block(0, i * kRefSize, kStateSize, kStateSize).template cast<float>()
       * state_scale;
     acado_W_.block(kStateSize, i*kRefSize+kStateSize, kInputSize, kInputSize) =
       W_.block(kStateSize, kStateSize, kInputSize, kInputSize).template cast<float>()
      * input_scale;
 
-    acado_Wlx_.block(i * kStateSize, 0, kStateSize, 1) =
-      Wlx_.template cast<float>() * state_scale;
+    // acado_Wlx_.block(i * kStateSize, 0, kStateSize, 1) =
+    //   Wlx_.template cast<float>() * state_scale;
+    acado_Wlx_.block(i * kStateSize, 0, kStateSize, 1) = 
+      q.block(i * kStateSize, 0, kStateSize, 1).template cast<float>() * state_scale;
   }
   state_scale = exp(- 1.0 * float(state_cost_scaling));
   acado_Wlx_.block(kSamples * kStateSize, 0, kStateSize, 1) = 
-    Wlx_.template cast<float>() * state_scale;
+    q.block(kSamples * kStateSize, 0, kStateSize, 1).template cast<float>() * state_scale;
 
   acado_W_end_ = WN_.template cast<float>();
-
-  std::cout << "acadoVariable.W [" << std::endl << acado_W_.block(0, 0, kRefSize, kRefSize) << "]" << std::endl;
-  // std::cout << "acadoVariable.Wlx [" << std::endl << acado_Wlx_.block(0, 0, kStateSize, 1) << "]" << std::endl;
-  // std::cout << "acadoVariable.WN [" << std::endl << acado_W_end_.block(0, 0, kEndRefSize, kEndRefSize) << "]" << std::endl;
 
   return true;
 }
@@ -233,6 +229,7 @@ bool MpcWrapper<T>::setTrajectory(
   Eigen::Map<Eigen::Matrix<float, kRefSize, kSamples, Eigen::ColMajor>>
     y(const_cast<float*>(acadoVariables.y));
 
+  // p_x, p_y, p_z, t, v_t
   acado_reference_states_.setZero();
   // q_w, q_x, q_y, q_z, v_x, v_y, v_z
   acado_reference_states_.block(3, 0, kStateSize-6, kSamples) =
@@ -240,6 +237,7 @@ bool MpcWrapper<T>::setTrajectory(
   // at
   acado_reference_states_.block(kStateSize-1, 0, 1, kSamples) =
     states.block(kStateSize-1, 0, 1, kSamples).template cast<float>();
+  // T, w_x, w_y, w_z
   acado_reference_states_.block(kStateSize, 0, kInputSize, kSamples) =
     inputs.block(0, 0, kInputSize, kSamples).template cast<float>();
 
@@ -293,9 +291,6 @@ bool MpcWrapper<T>::update(
     ROS_WARN("MPC: Solver was triggered without preparation, abort!");
     return false;
   }
-  std::cout << "acado_states_ [" << std::endl << acado_states_.col(0) << "]" << std::endl;
-  std::cout << "acado_reference_states_ [" << std::endl << acado_reference_states_.col(0) << "]" << std::endl;
-
 
   // Check if estimated and reference quaternion live in sthe same hemisphere.
   acado_initial_state_ = state.template cast<float>();
@@ -309,10 +304,6 @@ bool MpcWrapper<T>::update(
   // Perform feedback step and reset preparation check.
   int solve_status = acado_feedbackStep();
   acado_is_prepared_ = false;
-
-  // std::cout << "preparation_status " << preparation_status << std::endl;
-  std::cout << "QPOASES status " << solve_status << std::endl;
-  std::cout << "Objective value " << acado_getObjective() << std::endl;
 
   // Prepare if the solver if wanted
   if(do_preparation)
@@ -365,13 +356,6 @@ void MpcWrapper<T>::getInputs(
     Eigen::Ref<Eigen::Matrix<T, kInputSize, kSamples>> return_inputs)
 {
   return_inputs = acado_inputs_.cast<T>();
-}
-
-template <typename T>
-void MpcWrapper<T>::getVerbose()
-{
-  acado_printDifferentialVariables();
-	acado_printControlVariables();
 }
 
 template class MpcWrapper<float>;
