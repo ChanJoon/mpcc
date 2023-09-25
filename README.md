@@ -4,12 +4,12 @@
 
 (updated on 09/26)
 
-| <img src="images/mpcc_iris_0926.gif" alt="Iris (No Wind)"  /> | <img src="images/mpcc_iris_wind_0926.gif" alt="Iris (Wind)"  /> | <img src="images/mpcc_iris_wind_L1_0926.gif" alt="Iris (Wind+L1)"  /> |
+| <img src="images/mpcc_iris_0926.gif" alt="Iris (No Wind)"  width="300"/> | <img src="images/mpcc_iris_wind_0926.gif" alt="Iris (Wind)"  width="300"/> | <img src="images/mpcc_iris_wind_L1_0926.gif" alt="Iris (Wind+L1)"  width="300"/> |
 |:--:|:--:|:--:|
 |**Iris (No Wind)**|**Iris (Wind)**|**Iris (Wind+L1)**|
-| <img src="images/mpcc_typhoon_0926.gif" alt="Typhoon (No Wind)" /> | <img src="images/mpcc_typhoon_wind_0926.gif" alt="Typhoon (Wind)" /> | <img src="images/mpcc_typhoon_wind_L1_0926.gif" alt="Typhoon (Wind+L1)" /> |
+| <img src="images/mpcc_typhoon_0926.gif" alt="Typhoon (No Wind)" width="300"/> | <img src="images/mpcc_typhoon_wind_0926.gif" alt="Typhoon (Wind)" width="300"/> | <img src="images/mpcc_typhoon_wind_L1_0926.gif" alt="Typhoon (Wind+L1)" width="300"/> |
 |**Typhoon (No Wind) x4**|**Typhoon (Wind) x4**|**Typhoon (Wind+L1) x4**|
-|<img src="images/mpcc_typhoon_fail_0926.gif" alt="Typhoon (Fail)" />|
+|<img src="images/mpcc_typhoon_fail_0926.gif" alt="Typhoon (Fail)" width="300"/>|
 |**Typhoon with mpc_kepco_test x4**|
 
 ### Usage
