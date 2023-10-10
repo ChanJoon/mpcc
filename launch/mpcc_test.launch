@@ -1,9 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<launch>  
+<launch>    
+  <!-- <param name="/norm_thrust_const" value="0.05" /> -->
+  <!-- <param name="/norm_thrust_offset" value="0.08" /> -->
+  <!-- <param name="/max_thrust" value="0.7"/> -->
+  <!-- <param name="/min_thrust" value="0.4"/> -->
+
+  <!-- <param name="/max_throttle" value="16.0"/> -->
+  <!-- <param name="/min_throttle" value="8.0"/> -->
+
   <param name="/control_hz" value="200.0" />
     <!-- Throttle mapping -->
-  <param name="/norm_thrust_const" value="0.06" />
-  <param name="/norm_thrust_offset" value="0.1" />
+  <param name="/norm_thrust_const" value="0.07" />  <!-- 0.06 -->
+  <param name="/norm_thrust_offset" value="0.02" /> <!-- 0.1 -->
   <param name="/max_thrust" value="1.0"/>
   <param name="/min_thrust" value="0.1"/>
 
@@ -12,14 +20,11 @@
   <param name="/max_bodyrate_xy" value="1.5"/>
   <param name="/max_bodyrate_z" value="3.0"/>
 
-  <param name="/Q_pos_xy" value="200.0"/>
-  <param name="/Q_pos_z" value="500.0"/>
-  <param name="/Q_attitude" value="50.0"/>
-  <param name="/Q_velocity" value="5.0"/>
-  <param name="/R_thrust" value="5.0"/>
-  <param name="/R_pitchroll" value="10.0"/>
+  <param name="/R_thrust" value="0.1"/> <!-- 5.0 -->
+  <param name="/R_pitchroll" value="0.1"/>  <!-- 10.0 -->
   <!-- <param name="/R_pitchroll" value="50.0"/> -->
-  <param name="/R_yaw" value="5.0"/>
+  <param name="/R_yaw" value="0.1"/>
+  
   <param name="/state_cost_exponential" value="0.0"/>
   <param name="/input_cost_exponential" value="0.0"/>
 
@@ -36,12 +41,15 @@
 
   <param name="/K_adaacc" value="1.0"/>
 
+  <!-- MPCC -->
+  <param name="/rho" value="0.0005" />
+
   <!-- false: baseline // true: baseline+L1 -->
-  <param name="/L1_on" value="true"/>
+  <param name="/L1_on" value="false"/>
 
   <param name="/debug" value="true"/> 
 
-  <node pkg="mpcc" type="mpc_test_node" name="mpc_test_node" output="screen" />
-  <!-- <node pkg="mpcc" type="mpc_test_node" name="mpc_test_node" output="screen" launch-prefix="gdb -ex run -args"/> -->
+  <node pkg="mpcc" type="mpcc_test_node" name="mpcc_test_node" output="screen" />
+  <!-- <node pkg="mpcc" type="mpcc_test_node" name="mpcc_test_node" output="screen" launch-prefix="gdb -ex run -args"/> -->
     
 </launch>

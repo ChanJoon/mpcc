@@ -42,7 +42,7 @@
 #include <mavros_msgs/AttitudeTarget.h>
 
 // MPC
-#include "mpcc/mpc_wrapper.h"
+#include "mpcc/mpcc_wrapper.h"
 #include "mpcc/bezier_curve.h"
 
 using namespace std;
@@ -207,7 +207,7 @@ class MPCC{
 			nh.param("/K_adaacc", K_adaacc, 1.0);
 			nh.param("/L1_on", L1_on, true);
 			nh.param("/debug", debug, true);
-			nh.param("/rho", rho, 0.005);		// a weight of
+			nh.param("/rho", rho, 0.005);		// a weight of aggressiveness
 
 			// publishers
 			m_pos_ctrl_pub = nh.advertise<geometry_msgs::PoseStamped>("/mavros/setpoint_position/local", 3);
@@ -371,6 +371,7 @@ void MPCC::pub_cmd(){
 	att_msg.body_rate.x = ctbr_cmd(INPUT::kRateX)+ada_cmd(0);
 	att_msg.body_rate.y = ctbr_cmd(INPUT::kRateY)+ada_cmd(1);
 	att_msg.body_rate.z = ctbr_cmd(INPUT::kRateZ)+ada_cmd(2);
+	ROS_INFO("Befor mapping Thrust: %.2f", ctbr_cmd(INPUT::kThrust)+ada_cmd(3));
 
 	att_msg.thrust = throttle_mapping(ctbr_cmd(INPUT::kThrust)+ada_cmd(3));
 
@@ -416,8 +417,8 @@ void MPCC::solve_mpc(){
 		reference_states_(7, i) = t_vel(0);
 		reference_states_(8, i) = t_vel(1);
 		reference_states_(9, i) = t_vel(2);
-		reference_states_(10, i) = (target_traj.poses[i].header.stamp + ros::Duration(i * dt)).toSec();				// t
-		reference_states_(11, i) = 1;				// vt
+		reference_states_(10, i) = 0;				// t
+		reference_states_(11, i) = 0;				// vt
 		reference_states_(12, i) = 0;				// at
 
 		reference_inputs_(0, i) = 9.8066;	// T
@@ -443,6 +444,7 @@ void MPCC::solve_mpc(){
 	}
 	mpc_wrapper_.getStates(predicted_states_);
 	mpc_wrapper_.getInputs(predicted_inputs_);
+	// std::cout << predicted_states_.col(0) << std::endl;
 
 	if(debug){
 		pub_predict(predicted_states_, predicted_inputs_, call_time);
@@ -521,7 +523,8 @@ bool MPCC::set_params() {
 					grad_x * grad_x.transpose() + 
 					grad_y * grad_y.transpose() + 
 					grad_z * grad_z.transpose();
-		Q_tmp.block(3, 3, 10, 10) = Matrix<double, 10, 10>::Identity();
+		Q_tmp.block(3, 3, 7, 7) = Matrix<double, 7, 7>::Zero(); // Assign weights from q to v
+		Q_tmp.block(11, 11, 2, 2) = Matrix<double, 2, 2>::Zero(); // Assign weights vt, at
 
 		Q_.block(0, i * kRefSize, kStateSize, kStateSize) =
 			Q_tmp.block(0, 0, kStateSize, kStateSize);
@@ -537,9 +540,9 @@ bool MPCC::set_params() {
 			// Q_velocity_, Q_velocity_, Q_velocity_
 			// ).finished().asDiagonal();
 
-	R_.setIdentity();
-	// R_ = (Matrix<double, kInputSize, 1>() << 
-			// R_thrust_, R_pitchroll_, R_pitchroll_, R_yaw_, 1.0).finished().asDiagonal();
+	// R_.setIdentity();	// Assign weights to T and w
+	R_ = (Matrix<double, kInputSize, 1>() << 
+			R_thrust_, R_pitchroll_, R_pitchroll_, R_yaw_, 1.0).finished().asDiagonal();
 
 	mpc_wrapper_.setCosts(Q_, R_, q_, state_cost_exponential_, input_cost_exponential_);
 	mpc_wrapper_.setLimits(

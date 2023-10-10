@@ -54,7 +54,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fopenmp -O3")
 
-cs_add_library(mpc_solver
+cs_add_library(mpcc_solver
   qp_solver/qpoases/SRC/Bounds.cpp
   qp_solver/qpoases/SRC/Constraints.cpp
   qp_solver/qpoases/SRC/CyclingManager.cpp
@@ -70,28 +70,28 @@ cs_add_library(mpc_solver
   model/quadrotor_mpcc/acado_solver.c
   model/quadrotor_mpcc/acado_auxiliary_functions.c)
 
-target_include_directories(mpc_solver PUBLIC
+target_include_directories(mpcc_solver PUBLIC
   model/quadrotor_mpcc/
   qp_solver/qpoases
   qp_solver/qpoases/INCLUDE
   qp_solver/qpoases/SRC)
 
-cs_add_library(mpc_wrapper
-  src/mpc_wrapper.cpp)
+cs_add_library(mpcc_wrapper
+  src/mpcc_wrapper.cpp)
 
-target_link_libraries(mpc_wrapper
-  mpc_solver)
+target_link_libraries(mpcc_wrapper
+  mpcc_solver)
 
 # make an executable
 cs_install()
 cs_export()
 
-cs_add_executable(mpc_test_node
-  src/mpc_test.cpp)
+cs_add_executable(mpcc_test_node
+  src/mpcc_test.cpp)
 
-target_link_libraries(mpc_test_node
-  mpc_wrapper
-  mpc_solver)
+target_link_libraries(mpcc_test_node
+  mpcc_wrapper
+  mpcc_solver)
 
 cs_install()
 cs_export()
@@ -103,7 +103,7 @@ cs_install()
 cs_export()
 
 cs_add_executable(bezier_node
- src/bezier_curve_test.cpp)
+ test/bezier_curve_test.cpp)
 
 cs_install()
 cs_export()

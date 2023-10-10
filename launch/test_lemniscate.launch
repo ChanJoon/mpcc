@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>  
+  <node pkg="mpcc" type="test_lemniscate.py" name="test_lemniscate" output="screen" />
+
+	<include file="$(find mpcc)/launch/mpcc_test.launch" />
+
+</launch>

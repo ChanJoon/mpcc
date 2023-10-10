@@ -10,6 +10,7 @@ def hover():
     pub = rospy.Publisher('/target_pos', Odometry, queue_size=10)
     pub_path = rospy.Publisher('/target_path', Path, queue_size=10)
     pub_traj = rospy.Publisher('/target_traj', Path, queue_size=10)
+    pub_pose = rospy.Publisher('/target_pose', PoseStamped, queue_size=10)
     f = 10
     rate = rospy.Rate(f) 
     t=0.0
@@ -79,13 +80,10 @@ def hover():
                 traj_msg.poses.append(pose_msg)
 
         t=t+dt
-        # rospy.loginfo("target odom t: %f", msg.header.stamp.to_sec())
-        # rospy.loginfo("target traj t: %f", traj_msg.header.stamp.to_sec())
-        # rospy.loginfo("target traj t0: %f", traj_msg.poses[0].header.stamp.to_sec())
-        # rospy.loginfo("target traj tN: %f", traj_msg.poses[-1].header.stamp.to_sec())
         pub.publish(msg)  
         pub_path.publish(path_msg)
         pub_traj.publish(traj_msg)
+        pub_pose.publish(traj_msg.poses[0])
         rate.sleep()  
 
 if __name__ == '__main__':

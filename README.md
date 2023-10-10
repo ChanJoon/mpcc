@@ -13,17 +13,15 @@
 |**Typhoon with mpc_kepco_test x4**|
 
 ### Usage
-Iris
+**Iris**
 ```bash
 roslaunch mpcc quadrotor_gazebo.launch #gui:=false
-rosrun mpcc test_circle.py # or test_lemniscate.py
-roslaunch mpcc mpc_test.launch
+rosrun mpcc test_circle.launch # or test_lemniscate.launch
 ```
-Typhoon_h480
+**Typhoon_h480**
 ```bash
 roslaunch gazebo_test.launch
-rosrun mpcc test_circle.py # or test_lemniscate.py
-roslaunch mpcc mpc_kepco_test.launch
+rosrun mpcc test_circle.launch # or test_lemniscate.launch
 ```
 
 ### Updates
@@ -113,9 +111,12 @@ roslaunch mpcc mpc_kepco_test.launch
   - [x] : Figure out how `Wlx` works in acado
   - [x] : Fix weight matrices to have dynamic costs according to $\theta^{(k)}$
   - [x] : To find out $\theta^{(k)}$, generate the bezier curve path using */target traj*
-  - [ ] : Apply 0 weight to $q$ or $v$ if possible
-  - [ ] : test mpcc on lemniscate trajectory
+  - [x] : Apply 0 weight to $q$ or $v$ if possible
+          *Inputs $\textbf{u}$에 0~0.1 사이의 작은 값을 넣으면 정상적인 값이 나오지 않음*
+  - [x] : Test mpcc on lemniscate trajectory
   - [ ] : Refactoring
+    - [ ] : Effectively assign cost weight matrices for $t=0, 1, ..., N$ (without using loop twice)
+    - [ ] : C++ profiler
 
 ### Cost function 
 

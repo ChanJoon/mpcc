@@ -1,4 +1,4 @@
-#include "mpcc/mpc_test.h"
+#include "mpcc/mpcc_test.h"
 #include <signal.h>
 
 void signal_handler(sig_atomic_t s) {
@@ -10,7 +10,7 @@ int main(int argc, char **argv){
 
   signal(SIGINT, signal_handler); // to exit program when ctrl+c
 
-  ros::init(argc, argv, "mpc_node");
+  ros::init(argc, argv, "mpcc_node");
   ros::NodeHandle n("~");
   MPCC MPCC(n);    
   ros::AsyncSpinner spinner(5); // Use 5 threads -> 5 callbacks

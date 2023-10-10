@@ -22,7 +22,7 @@
  */
 
 
-#include "mpcc/mpc_wrapper.h"
+#include "mpcc/mpcc_wrapper.h"
 
 
 namespace mpcc {
@@ -235,9 +235,9 @@ bool MpcWrapper<T>::setTrajectory(
   acado_reference_states_.block(3, 0, kStateSize-6, kSamples) =
     states.block(3, 0, kStateSize-6, kSamples).template cast<float>();
   // at
-  acado_reference_states_.block(kStateSize-1, 0, 1, kSamples) =
-    states.block(kStateSize-1, 0, 1, kSamples).template cast<float>();
-  // T, w_x, w_y, w_z
+  // acado_reference_states_.block(kStateSize-1, 0, 1, kSamples) =
+    // states.block(kStateSize-1, 0, 1, kSamples).template cast<float>();
+  // T, w_x, w_y, w_z, jt
   acado_reference_states_.block(kStateSize, 0, kInputSize, kSamples) =
     inputs.block(0, 0, kInputSize, kSamples).template cast<float>();
 
@@ -305,6 +305,8 @@ bool MpcWrapper<T>::update(
   int solve_status = acado_feedbackStep();
   acado_is_prepared_ = false;
 
+  // std::cout << "Solver status " << solve_status << std::endl;
+  // std::cout << "Objective value " << acado_getObjective() << std::endl;
   // Prepare if the solver if wanted
   if(do_preparation)
   {
