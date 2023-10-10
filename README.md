@@ -21,10 +21,10 @@ rosrun mpcc test_circle.launch # or test_lemniscate.launch
 **Typhoon_h480**
 ```bash
 roslaunch gazebo_test.launch
-rosrun mpcc test_kepco_circle.launch # or test_lemniscate.launch
+rosrun mpcc test_kepco_circle.launch
 ```
-<details>
-  <summary style="font-size: 1.6em;"><b>Updates</b></summary>
+
+### Updates
 
 - **23-10-10**
   - 사용하지 않는 파일들 삭제 및 `mpc`를 `mpcc`로 모두 명명 변경 (To fix symbol lookup error)
@@ -35,6 +35,9 @@ rosrun mpcc test_kepco_circle.launch # or test_lemniscate.launch
     - Inputs $T, w_x, w_y, w_z, \bar{J_t}$에 rosparam으로 weight 부여하도록 하고 최대한 작은 값인 0.1 넣음 Roll, Pitch는 너무 작으면 불안정하여 0.05를 넣음
   - Thrust mappng 관련 변수인 `norm_thrust_const`, `norm_thrust_offset`을 튜닝
   - `min_throttle`이 너무 작으면 처음 타겟인 호버링 지점으로 갈 때 비정상적인 비행을 함. 현재도 typhoon 기체는 호버링 위치보다 더 높게 올라간 후에 경로점으로 비행시작함.(L1을 같이 사용하면 정상적임)
+
+<details>
+  <summary><b>Previous updates</b></summary>
 
 - **23-09-26**
   - [bezier_curve.h](include/mpcc/bezier_curve.h): 경로점 6개를 받아 5차 베지어 커브를 생성
@@ -107,8 +110,16 @@ rosrun mpcc test_kepco_circle.launch # or test_lemniscate.launch
 
 ### TODO List
 
+- [ ] : How will `yaw` be applied?. (Searching other papers or reformulating $J$)
+- [ ] : Solve unstable flight to first hover point
+- [ ] : Refactoring
+  - [ ] : Effectively assign cost weight matrices for $t=0, 1, ..., N$ (without using loop twice)
+  - [ ] : C++ profiler
+
+<details>
+  <summary><b>Previous todos</b></summary>
+
   - [x] : Update acado model to include $-\rho\cdot v_t$
-  - [ ] : How will `yaw` be applied?. (Searching other papers or reformulating $J$)
   - [x] : What is `acado_initializeNodesByForwardSimulation()`?
   - [x] : Initialize `acado_reference_states_`, `acado_reference_end_states_` accordingly
   - [x] : Initialize local variables `W_`, `WN_` in `mpc_wrapper.h` accordingly
@@ -124,12 +135,8 @@ rosrun mpcc test_kepco_circle.launch # or test_lemniscate.launch
   - [x] : Fix weight matrices to have dynamic costs according to $\theta^{(k)}$
   - [x] : To find out $\theta^{(k)}$, generate the bezier curve path using */target traj*
   - [x] : Apply 0 weight to $q$ or $v$ if possible
-          *Inputs $\textbf{u}$에 0~0.1 사이의 작은 값을 넣으면 정상적인 값이 나오지 않음*
   - [x] : Test mpcc on lemniscate trajectory
-  - [ ] : Solve unstable flight to first hover point
-  - [ ] : Refactoring
-    - [ ] : Effectively assign cost weight matrices for $t=0, 1, ..., N$ (without using loop twice)
-    - [ ] : C++ profiler
+</details>
 
 ### Cost function 
 
@@ -145,7 +152,7 @@ $$\begin{align}J&=\sum_{k=1}^N\{\sum_{\mu=x,y,z}(\mu^{(k)}-\mu_p(t^{(k)}))^2-\rh
 ---
 *Convert quadratic form(OSQP) to a weighted $`l_2`$-norm(ACADO)*
 
-$$\begin{flalign}&=\sum_{k=1}^N\| \begin{bmatrix}p_x\cr p_y\cr p_z\cr t\cr v_t\end{bmatrix} - \begin{bmatrix}0\cr 0 \cr 0\cr 0\cr 0\end{bmatrix} \|^2_Q + \| \begin{bmatrix}T\cr w\cr \bar{J_t}\end{bmatrix} - \begin{bmatrix}T_{ref}\cr w_{ref}\cr 0\end{bmatrix} \|^2_R + q^T\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} \\
+$$\begin{flalign}&=\sum_{k=1}^N\| \begin{bmatrix}p_x\cr p_y\cr p_z\cr t\cr v_t\end{bmatrix} - \begin{bmatrix}0\cr 0 \cr 0\cr 0\cr 0\end{bmatrix} \|^2_Q + \| \begin{bmatrix}T\cr w\cr \bar{J_t}\end{bmatrix} - \begin{bmatrix}T_{ref}\cr w_{ref}\cr \bar{J_{t, ref}}\end{bmatrix} \|^2_R + q^T\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} \\
 &=\sum_{k=1}^N\| h(x_k, u_k) - \bar{y_k}\|^2_W+\textbf{Wlx}^Tx_k \ \text{(linear term)} \tag*{(ACADO p.103)}\\
 s.t & \ \ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix}, Q=\begin{bmatrix}1 & 0 & 0 & -v_{ref.x}(\theta)\cr 0 & 1 & 0 & -v_{ref.y}(\theta)\cr 0 & 0 & 1 & -v_{ref.z}(\theta) \cr -v_{ref.x}(\theta) & -v_{ref.y}(\theta) & -v_{ref.z}(\theta) & \sum v_{ref}(\theta)^2\end{bmatrix},\ q=\begin{bmatrix}2(-p_{ref.x}(\theta)+v_{ref.x}(\theta)\cdot \theta)\cr 2(-p_{ref.y}(\theta)+v_{ref.y}(\theta)\cdot \theta)\cr 2(-p_{ref.z}(\theta)+v_{ref.z}(\theta)\cdot \theta)\cr -2\sum v_{ref}(\theta)(-p_{ref}(\theta)+v_{ref}(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T\end{flalign}$$
 
