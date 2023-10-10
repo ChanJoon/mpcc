@@ -139,7 +139,7 @@ class MPCC{
 		Matrix<double, kStateSize, 1> grad_y;
 		Matrix<double, kStateSize, 1> grad_z;
 
-		double max_bodyrate_xy_, max_bodyrate_z_, max_throttle_, min_throttle_, max_jerk_, Q_pos_xy_, Q_pos_z_, Q_attitude_, Q_velocity_, R_thrust_, R_pitchroll_, R_yaw_, R_jt, state_cost_exponential_, input_cost_exponential_;
+		double max_bodyrate_xy_, max_bodyrate_z_, max_throttle_, min_throttle_, max_jerk_, Q_pos_xy_, Q_pos_z_, Q_attitude_, Q_velocity_, Q_vt_, Q_at_, R_thrust_, R_pitchroll_, R_yaw_, R_jt_, state_cost_exponential_, input_cost_exponential_;
 		
 		// ROS
 		ros::NodeHandle nh;
@@ -191,10 +191,12 @@ class MPCC{
 			nh.param("/Q_pos_z", Q_pos_z_, 0.1);
 			nh.param("/Q_attitude", Q_attitude_, 0.1);
 			nh.param("/Q_velocity", Q_velocity_, 0.1);
+			nh.param("/Q_vt", Q_vt_, 0.1);
+			nh.param("/Q_at", Q_at_, 0.1);
 			nh.param("/R_thrust", R_thrust_, 0.1);
 			nh.param("/R_pitchroll", R_pitchroll_, 0.1);
 			nh.param("/R_yaw", R_yaw_, 0.1);
-			nh.param("/R_jt", R_jt, 0.1);
+			nh.param("/R_jt", R_jt_, 0.1);
 			nh.param("/state_cost_exponential", state_cost_exponential_, 0.1);
 			nh.param("/input_cost_exponential", input_cost_exponential_, 0.1);
 			nh.param("/cutoff_freq_m", m_cutoff_hz, 1.0);
@@ -445,7 +447,12 @@ void MPCC::solve_mpc(){
 	}
 	mpc_wrapper_.getStates(predicted_states_);
 	mpc_wrapper_.getInputs(predicted_inputs_);
-	// std::cout << predicted_states_.col(0) << std::endl;
+	ROS_INFO("State [ %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f ]",
+			predicted_states_(0, 0), predicted_states_(1, 0), predicted_states_(2, 0),
+			predicted_states_(3, 0), predicted_states_(4, 0), predicted_states_(5, 0), predicted_states_(6, 0),
+			predicted_states_(7, 0), predicted_states_(8, 0), predicted_states_(9, 0),
+			predicted_states_(10, 0), predicted_states_(11, 0), predicted_states_(12, 0));
+	ROS_INFO("Input [ %.2f, %.2f, %.2f, %.2f, %.2f ]", predicted_inputs_(0, 0), predicted_inputs_(1, 0), predicted_inputs_(2, 0), predicted_inputs_(3, 0), predicted_inputs_(4, 0));
 
 	if(debug){
 		pub_predict(predicted_states_, predicted_inputs_, call_time);
@@ -524,8 +531,12 @@ bool MPCC::set_params() {
 					grad_x * grad_x.transpose() + 
 					grad_y * grad_y.transpose() + 
 					grad_z * grad_z.transpose();
-		Q_tmp.block(3, 3, 7, 7) = Matrix<double, 7, 7>::Zero(); // Assign weights from q to v
-		Q_tmp.block(11, 11, 2, 2) = Matrix<double, 2, 2>::Zero(); // Assign weights vt, at
+		Q_tmp.block(3, 3, 7, 7) = (Matrix<double, 7, 1>() <<
+			Q_attitude_, Q_attitude_, Q_attitude_, Q_attitude_,
+			Q_velocity_, Q_velocity_, Q_velocity_
+			).finished().asDiagonal(); // Assign weights from q to v
+		Q_tmp.block(11, 11, 2, 2) = (Matrix<double, 2, 1>() <<
+			Q_vt_, Q_at_).finished().asDiagonal(); // Assign weights vt, at
 
 		Q_.block(0, i * kRefSize, kStateSize, kStateSize) =
 			Q_tmp.block(0, 0, kStateSize, kStateSize);
@@ -543,7 +554,7 @@ bool MPCC::set_params() {
 
 	// R_.setIdentity();	// Assign weights to T and w
 	R_ = (Matrix<double, kInputSize, 1>() << 
-			R_thrust_, R_pitchroll_, R_pitchroll_, R_yaw_, R_jt).finished().asDiagonal();
+			R_thrust_, R_pitchroll_, R_pitchroll_, R_yaw_, R_jt_).finished().asDiagonal();
 
 	mpc_wrapper_.setCosts(Q_, R_, q_, state_cost_exponential_, input_cost_exponential_);
 	mpc_wrapper_.setLimits(

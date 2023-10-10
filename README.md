@@ -21,7 +21,7 @@ rosrun mpcc test_circle.launch # or test_lemniscate.launch
 **Typhoon_h480**
 ```bash
 roslaunch gazebo_test.launch
-rosrun mpcc test_circle.launch # or test_lemniscate.launch
+rosrun mpcc test_kepco_circle.launch # or test_lemniscate.launch
 ```
 <details>
   <summary style="font-size: 1.6em;"><b>Updates</b></summary>
@@ -30,9 +30,11 @@ rosrun mpcc test_circle.launch # or test_lemniscate.launch
   - 사용하지 않는 파일들 삭제 및 `mpc`를 `mpcc`로 모두 명명 변경 (To fix symbol lookup error)
   - [mpc_test.h](include/mpcc/mpc_test.h):
     - `reference_states_`에서 `t`와 `vt` 모두 0으로 변경. reference에 값을 넣으면 LSQ Term에서 차이값에 대해 QPOASES가 풀리기 때문에 여기에는 0을 넣고 Cost function을 weight를 조정해서 맞춤.
-    - $vt \approx 1$ 일 때 전역 경로에 대한 드론의 위치가 적절한데 현재는 값이 계속해서 증가함.
-    - $q, v, v_t, a_t$ 에 weight 0을 부여
-    - The inputs $T, w_x, w_y, w_z, \bar{J_t}$에 rosparam으로 weight 부여하도록 하고 최대한 작은 값인 0.1 넣음 (mpcc_test.launch 참고)
+    - $vt \approx 1$ 일 때 전역 경로에 대한 드론의 위치가 적절한데 현재는 값이 불분명함.
+    - States $q, v, v_t, a_t$ 에 weight 0.01 을 부여
+    - Inputs $T, w_x, w_y, w_z, \bar{J_t}$에 rosparam으로 weight 부여하도록 하고 최대한 작은 값인 0.1 넣음 Roll, Pitch는 너무 작으면 불안정하여 0.05를 넣음
+  - Thrust mappng 관련 변수인 `norm_thrust_const`, `norm_thrust_offset`을 튜닝
+  - `min_throttle`이 너무 작으면 처음 타겟인 호버링 지점으로 갈 때 비정상적인 비행을 함. 현재도 typhoon 기체는 호버링 위치보다 더 높게 올라간 후에 경로점으로 비행시작함.(L1을 같이 사용하면 정상적임)
 
 - **23-09-26**
   - [bezier_curve.h](include/mpcc/bezier_curve.h): 경로점 6개를 받아 5차 베지어 커브를 생성
@@ -124,6 +126,7 @@ rosrun mpcc test_circle.launch # or test_lemniscate.launch
   - [x] : Apply 0 weight to $q$ or $v$ if possible
           *Inputs $\textbf{u}$에 0~0.1 사이의 작은 값을 넣으면 정상적인 값이 나오지 않음*
   - [x] : Test mpcc on lemniscate trajectory
+  - [ ] : Solve unstable flight to first hover point
   - [ ] : Refactoring
     - [ ] : Effectively assign cost weight matrices for $t=0, 1, ..., N$ (without using loop twice)
     - [ ] : C++ profiler

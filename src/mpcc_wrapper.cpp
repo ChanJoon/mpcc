@@ -305,8 +305,8 @@ bool MpcWrapper<T>::update(
   int solve_status = acado_feedbackStep();
   acado_is_prepared_ = false;
 
-  // std::cout << "Solver status " << solve_status << std::endl;
-  // std::cout << "Objective value " << acado_getObjective() << std::endl;
+  std::cout << "Solver status " << solve_status << std::endl;
+  std::cout << "Objective value " << acado_getObjective() << std::endl;
   // Prepare if the solver if wanted
   if(do_preparation)
   {
