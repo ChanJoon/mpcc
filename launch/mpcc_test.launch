@@ -24,6 +24,7 @@
   <param name="/R_pitchroll" value="0.1"/>  <!-- 10.0 -->
   <!-- <param name="/R_pitchroll" value="50.0"/> -->
   <param name="/R_yaw" value="0.1"/>
+  <param name="/R_jt" value="0.1"/>
   
   <param name="/state_cost_exponential" value="0.0"/>
   <param name="/input_cost_exponential" value="0.0"/>

@@ -23,8 +23,17 @@ rosrun mpcc test_circle.launch # or test_lemniscate.launch
 roslaunch gazebo_test.launch
 rosrun mpcc test_circle.launch # or test_lemniscate.launch
 ```
+<details>
+  <summary style="font-size: 1.6em;"><b>Updates</b></summary>
 
-### Updates
+- **23-10-10**
+  - 사용하지 않는 파일들 삭제 및 `mpc`를 `mpcc`로 모두 명명 변경 (To fix symbol lookup error)
+  - [mpc_test.h](include/mpcc/mpc_test.h):
+    - `reference_states_`에서 `t`와 `vt` 모두 0으로 변경. reference에 값을 넣으면 LSQ Term에서 차이값에 대해 QPOASES가 풀리기 때문에 여기에는 0을 넣고 Cost function을 weight를 조정해서 맞춤.
+    - $vt \approx 1$ 일 때 전역 경로에 대한 드론의 위치가 적절한데 현재는 값이 계속해서 증가함.
+    - $q, v, v_t, a_t$ 에 weight 0을 부여
+    - The inputs $T, w_x, w_y, w_z, \bar{J_t}$에 rosparam으로 weight 부여하도록 하고 최대한 작은 값인 0.1 넣음 (mpcc_test.launch 참고)
+
 - **23-09-26**
   - [bezier_curve.h](include/mpcc/bezier_curve.h): 경로점 6개를 받아 5차 베지어 커브를 생성
   - [bezier_curve_test.h](include/mpcc/bezier_curve_test.h): `nav_msgs/Path` 콜백함수으로 베지어 경로를 생성하고 다시 `Path`로 생성. `bezier_curve.h` 디버깅을 위한 테스트 코드
@@ -92,6 +101,7 @@ rosrun mpcc test_circle.launch # or test_lemniscate.launch
     - sh_mpc에서는 `kRefSize` = `kStateSize` + `kInputSize` 이고, `kCostSize`는 hN 함수에 대한 cost weigt matrix dimension으로 사용됨. 현재 mpcc acado 모델에서는 `kRefSize`=5 < `kStateSize`=13 이므로 kCostSize를 제거하거나 맞게 변경함.
     - mpc에서는 $x^TQx+u^TRx=state^TWstate$ 로 acado QP에 넣어주는데 mpcc에서는 $x^TQx$만 사용하고자, `mpc_wrapper`에서 `Q`의 크기를 `kRefSize`로 변경함.
   - [mpc_test.h](include/mpcc/mpc_test.h): `mpc_wrapper`에 맞게 `Eigen::Matrix Q`를 선언
+</details>
 
 ### TODO List
 
@@ -132,7 +142,7 @@ $$\begin{align}J&=\sum_{k=1}^N\{\sum_{\mu=x,y,z}(\mu^{(k)}-\mu_p(t^{(k)}))^2-\rh
 ---
 *Convert quadratic form(OSQP) to a weighted $`l_2`$-norm(ACADO)*
 
-$$\begin{flalign}&=\sum_{k=1}^N\| \begin{bmatrix}p_x\cr p_y\cr p_z\cr t\cr v_t\end{bmatrix} - \begin{bmatrix}0\cr 0 \cr 0\cr 0\cr 0\end{bmatrix} \|^2_Q + \| \begin{bmatrix}q\cr v\cr a_t \cr T\cr w\end{bmatrix} - \begin{bmatrix}q_{ref}\cr v_{ref} \cr 0\cr T_{ref}\cr w_{ref}\end{bmatrix} \|^2_I + q^T\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} \\
+$$\begin{flalign}&=\sum_{k=1}^N\| \begin{bmatrix}p_x\cr p_y\cr p_z\cr t\cr v_t\end{bmatrix} - \begin{bmatrix}0\cr 0 \cr 0\cr 0\cr 0\end{bmatrix} \|^2_Q + \| \begin{bmatrix}T\cr w\cr \bar{J_t}\end{bmatrix} - \begin{bmatrix}T_{ref}\cr w_{ref}\cr 0\end{bmatrix} \|^2_R + q^T\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} \\
 &=\sum_{k=1}^N\| h(x_k, u_k) - \bar{y_k}\|^2_W+\textbf{Wlx}^Tx_k \ \text{(linear term)} \tag*{(ACADO p.103)}\\
 s.t & \ \ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix}, Q=\begin{bmatrix}1 & 0 & 0 & -v_{ref.x}(\theta)\cr 0 & 1 & 0 & -v_{ref.y}(\theta)\cr 0 & 0 & 1 & -v_{ref.z}(\theta) \cr -v_{ref.x}(\theta) & -v_{ref.y}(\theta) & -v_{ref.z}(\theta) & \sum v_{ref}(\theta)^2\end{bmatrix},\ q=\begin{bmatrix}2(-p_{ref.x}(\theta)+v_{ref.x}(\theta)\cdot \theta)\cr 2(-p_{ref.y}(\theta)+v_{ref.y}(\theta)\cdot \theta)\cr 2(-p_{ref.z}(\theta)+v_{ref.z}(\theta)\cdot \theta)\cr -2\sum v_{ref}(\theta)(-p_{ref}(\theta)+v_{ref}(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T\end{flalign}$$
 

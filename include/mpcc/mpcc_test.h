@@ -139,7 +139,7 @@ class MPCC{
 		Matrix<double, kStateSize, 1> grad_y;
 		Matrix<double, kStateSize, 1> grad_z;
 
-		double max_bodyrate_xy_, max_bodyrate_z_, max_throttle_, min_throttle_, max_jerk_, Q_pos_xy_, Q_pos_z_, Q_attitude_, Q_velocity_, R_thrust_, R_pitchroll_, R_yaw_, state_cost_exponential_, input_cost_exponential_;
+		double max_bodyrate_xy_, max_bodyrate_z_, max_throttle_, min_throttle_, max_jerk_, Q_pos_xy_, Q_pos_z_, Q_attitude_, Q_velocity_, R_thrust_, R_pitchroll_, R_yaw_, R_jt, state_cost_exponential_, input_cost_exponential_;
 		
 		// ROS
 		ros::NodeHandle nh;
@@ -194,6 +194,7 @@ class MPCC{
 			nh.param("/R_thrust", R_thrust_, 0.1);
 			nh.param("/R_pitchroll", R_pitchroll_, 0.1);
 			nh.param("/R_yaw", R_yaw_, 0.1);
+			nh.param("/R_jt", R_jt, 0.1);
 			nh.param("/state_cost_exponential", state_cost_exponential_, 0.1);
 			nh.param("/input_cost_exponential", input_cost_exponential_, 0.1);
 			nh.param("/cutoff_freq_m", m_cutoff_hz, 1.0);
@@ -542,7 +543,7 @@ bool MPCC::set_params() {
 
 	// R_.setIdentity();	// Assign weights to T and w
 	R_ = (Matrix<double, kInputSize, 1>() << 
-			R_thrust_, R_pitchroll_, R_pitchroll_, R_yaw_, 1.0).finished().asDiagonal();
+			R_thrust_, R_pitchroll_, R_pitchroll_, R_yaw_, R_jt).finished().asDiagonal();
 
 	mpc_wrapper_.setCosts(Q_, R_, q_, state_cost_exponential_, input_cost_exponential_);
 	mpc_wrapper_.setLimits(
