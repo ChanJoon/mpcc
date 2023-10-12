@@ -2,15 +2,13 @@
 
 ### Demos
 
-(updated on 09/26)
+(updated on 10/12)
 
-| <img src="images/mpcc_iris_0926.gif" alt="Iris (No Wind)"  width="300"/> | <img src="images/mpcc_iris_wind_0926.gif" alt="Iris (Wind)"  width="300"/> | <img src="images/mpcc_iris_wind_L1_0926.gif" alt="Iris (Wind+L1)"  width="300"/> |
+| <img src="images/mpcc_iris_nowind.gif" alt="Iris (No Wind)"  width="300"/> | <img src="images/mpcc_iris_wind.gif" alt="Iris (Wind)"  width="300"/> | <img src="images/mpcc_iris_wind_L1.gif" alt="Iris (Wind+L1)"  width="300"/> |
 |:--:|:--:|:--:|
-|**Iris (No Wind)**|**Iris (Wind)**|**Iris (Wind+L1)**|
-| <img src="images/mpcc_typhoon_0926.gif" alt="Typhoon (No Wind)" width="300"/> | <img src="images/mpcc_typhoon_wind_0926.gif" alt="Typhoon (Wind)" width="300"/> | <img src="images/mpcc_typhoon_wind_L1_0926.gif" alt="Typhoon (Wind+L1)" width="300"/> |
-|**Typhoon (No Wind) x4**|**Typhoon (Wind) x4**|**Typhoon (Wind+L1) x4**|
-|<img src="images/mpcc_typhoon_fail_0926.gif" alt="Typhoon (Fail)" width="300"/>|
-|**Typhoon with mpc_kepco_test x4**|
+|**iris (No Wind)**|**iris (Wind)**|**iris (Wind+L1)**|
+| <img src="images/mpcc_typhoon_nowind.gif" alt="Typhoon (No Wind)" width="300"/> | <img src="images/mpcc_typhoon_wind.gif" alt="Typhoon (Wind)" width="300"/> | <img src="images/mpcc_typhoon_wind_L1.gif" alt="Typhoon (Wind+L1)" width="300"/> |
+|**typhoon (No Wind)**|**typhoon (Wind)**|**typhoon (Wind+L1)**|
 
 ### Usage
 **Iris**

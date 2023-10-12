@@ -43,7 +43,7 @@
   <param name="/rho" value="0.005" />
 
   <!-- false: baseline // true: baseline+L1 -->
-  <param name="/L1_on" value="false"/>
+  <param name="/L1_on" value="true"/>
 
   <param name="/debug" value="true"/> 
 

@@ -374,7 +374,6 @@ void MPCC::pub_cmd(){
 	att_msg.body_rate.x = ctbr_cmd(INPUT::kRateX)+ada_cmd(0);
 	att_msg.body_rate.y = ctbr_cmd(INPUT::kRateY)+ada_cmd(1);
 	att_msg.body_rate.z = ctbr_cmd(INPUT::kRateZ)+ada_cmd(2);
-	ROS_INFO("Befor mapping Thrust: %.2f", ctbr_cmd(INPUT::kThrust)+ada_cmd(3));
 
 	att_msg.thrust = throttle_mapping(ctbr_cmd(INPUT::kThrust)+ada_cmd(3));
 
@@ -447,14 +446,14 @@ void MPCC::solve_mpc(){
 	}
 	mpc_wrapper_.getStates(predicted_states_);
 	mpc_wrapper_.getInputs(predicted_inputs_);
-	ROS_INFO("State [ %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f ]",
-			predicted_states_(0, 0), predicted_states_(1, 0), predicted_states_(2, 0),
-			predicted_states_(3, 0), predicted_states_(4, 0), predicted_states_(5, 0), predicted_states_(6, 0),
-			predicted_states_(7, 0), predicted_states_(8, 0), predicted_states_(9, 0),
-			predicted_states_(10, 0), predicted_states_(11, 0), predicted_states_(12, 0));
-	ROS_INFO("Input [ %.2f, %.2f, %.2f, %.2f, %.2f ]", predicted_inputs_(0, 0), predicted_inputs_(1, 0), predicted_inputs_(2, 0), predicted_inputs_(3, 0), predicted_inputs_(4, 0));
 
 	if(debug){
+		ROS_INFO("State [ %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f ]",
+				predicted_states_(0, 0), predicted_states_(1, 0), predicted_states_(2, 0),
+				predicted_states_(3, 0), predicted_states_(4, 0), predicted_states_(5, 0), predicted_states_(6, 0),
+				predicted_states_(7, 0), predicted_states_(8, 0), predicted_states_(9, 0),
+				predicted_states_(10, 0), predicted_states_(11, 0), predicted_states_(12, 0));
+		ROS_INFO("Input [ %.2f, %.2f, %.2f, %.2f, %.2f ]", predicted_inputs_(0, 0), predicted_inputs_(1, 0), predicted_inputs_(2, 0), predicted_inputs_(3, 0), predicted_inputs_(4, 0));
 		pub_predict(predicted_states_, predicted_inputs_, call_time);
 	}
 
