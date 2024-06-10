@@ -1,0 +1,8 @@
+windpoints: # min_x, min_y, min_z, max_x, max_y, max_z, direction(0.0, 1.0, 2.0, 3.0: n, e, w, s), wind level (Newton unit), Gaussian noise of wind level
+   [-10.0, -10.0, 2.5,  10.0, 10.0, 10.0,  0.0,  4.0,  0.3
+   ]
+
+  #0.0: +x direction
+  #1.0: -y direction
+  #2.0: -x direction
+  #3.0: -x direction
