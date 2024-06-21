@@ -2,6 +2,6 @@
 <launch>  
   <node pkg="mpcc" type="test_circle.py" name="test_circle" output="screen" />
 
-	<include file="$(find mpcc)/launch/mpcc_test.launch" />
+	<include file="$(find mpcc)/launch/mpcc_iris_test.launch" />
 
 </launch>

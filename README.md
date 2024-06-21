@@ -1,28 +1,22 @@
 # Model Predicive Contouring Control
 
-### Demos
-
-(updated on 10/12)
-
-| <img src="images/mpcc_iris_nowind.gif" alt="Iris (No Wind)"  width="300"/> | <img src="images/mpcc_iris_wind.gif" alt="Iris (Wind)"  width="300"/> | <img src="images/mpcc_iris_wind_L1.gif" alt="Iris (Wind+L1)"  width="300"/> |
-|:--:|:--:|:--:|
-|**iris (No Wind)**|**iris (Wind)**|**iris (Wind+L1)**|
-| <img src="images/mpcc_typhoon_nowind.gif" alt="Typhoon (No Wind)" width="300"/> | <img src="images/mpcc_typhoon_wind.gif" alt="Typhoon (Wind)" width="300"/> | <img src="images/mpcc_typhoon_wind_L1.gif" alt="Typhoon (Wind+L1)" width="300"/> |
-|**typhoon (No Wind)**|**typhoon (Wind)**|**typhoon (Wind+L1)**|
 
 ### Usage
 **Iris**
 ```bash
 roslaunch mpcc quadrotor_gazebo.launch #gui:=false
-rosrun mpcc test_circle.launch # or test_lemniscate.launch
+rosrun mpcc test_iris_circle.launch # or test_lemniscate.launch
 ```
 **Typhoon_h480**
 ```bash
-roslaunch gazebo_test.launch
-rosrun mpcc test_kepco_circle.launch
+roslaunch mpcc quadrotor_gazebo.launch vehicle:=typhoon_h480
+rosrun mpcc test_typhoon_circle.launch
 ```
 
 ### Updates
+
+<details>
+  <summary><b>Previous updates</b></summary>
 
 - **23-10-10**
   - 사용하지 않는 파일들 삭제 및 `mpc`를 `mpcc`로 모두 명명 변경 (To fix symbol lookup error)
@@ -33,9 +27,6 @@ rosrun mpcc test_kepco_circle.launch
     - Inputs $T, w_x, w_y, w_z, \bar{J_t}$에 rosparam으로 weight 부여하도록 하고 최대한 작은 값인 0.1 넣음 Roll, Pitch는 너무 작으면 불안정하여 0.05를 넣음
   - Thrust mappng 관련 변수인 `norm_thrust_const`, `norm_thrust_offset`을 튜닝
   - `min_throttle`이 너무 작으면 처음 타겟인 호버링 지점으로 갈 때 비정상적인 비행을 함. 현재도 typhoon 기체는 호버링 위치보다 더 높게 올라간 후에 경로점으로 비행시작함.(L1을 같이 사용하면 정상적임)
-
-<details>
-  <summary><b>Previous updates</b></summary>
 
 - **23-09-26**
   - [bezier_curve.h](include/mpcc/bezier_curve.h): 경로점 6개를 받아 5차 베지어 커브를 생성
@@ -159,7 +150,7 @@ s.t & \ \ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix}, Q=\begin{bmatrix}1 & 0 
 $$\begin{gather}\textbf{x}=\begin{bmatrix}p_x, p_y, p_z, q_w, q_x, q_y, q_z, v_x, v_y, v_z, t, v_t, a_t\end{bmatrix}\\
 \textbf{u}=\begin{bmatrix}T, w_x, w_y, w_z, \bar{J_t}\end{bmatrix}\end{gather}$$
 
-*References*
+### References
  - Falanga, Davide, et al. "PAMPC: Perception-aware model predictive control for quadrotors." 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2018. https://doi.org/10.48550/arXiv.1804.04811
  - Ji, Jialin, et al. "Cmpcc: Corridor-based model predictive contouring control for aggressive drone flight." Experimental Robotics: The 17th International Symposium. Springer International Publishing, 2021. https://doi.org/10.48550/arXiv.2007.03271
  - Romero, Angel, et al. "Model predictive contouring control for time-optimal quadrotor flight." IEEE Transactions on Robotics 38.6 (2022): 3340-3356. https://doi.org/10.48550/arXiv.2108.13205

@@ -16,14 +16,14 @@
     <arg name="sdf" default="$(find mavlink_sitl_gazebo)/models/$(arg vehicle)/$(arg vehicle).sdf"/>
 
     <!-- Wind disturbance -->    
-    <rosparam file="$(find sh_mpc)/config/iris_wind_param.yaml" command="load"/>  
-    <!-- <node name="wind_disturbance" pkg="sh_mpc" type="wind_node"/> -->
+    <rosparam file="$(find mpcc)/config/iris_wind_param.yaml" command="load"/>  
+    <node name="wind_disturbance" pkg="mpcc" type="wind_node"/>
 
   <!-- UAV path visualize-->
-  <node name="path_publisher" pkg="kepco_sim" type="path_publisher.py" output="screen"/>
+  <node name="path_publisher" pkg="mpcc" type="path_publisher.py" output="screen"/>
 
     <!-- gazebo configs -->
-    <arg name="gui" default="true"/>
+    <arg name="gui" default="false"/>
     <arg name="debug" default="false"/>
     <arg name="verbose" default="false"/>
     <arg name="paused" default="false"/>

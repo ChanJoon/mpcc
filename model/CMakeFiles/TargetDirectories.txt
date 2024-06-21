@@ -1,0 +1,3 @@
+/home/as06047/catkin_ws/src/mpcc/model/CMakeFiles/quadrotor_mpcc_codegen.dir
+/home/as06047/catkin_ws/src/mpcc/model/CMakeFiles/edit_cache.dir
+/home/as06047/catkin_ws/src/mpcc/model/CMakeFiles/rebuild_cache.dir
