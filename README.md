@@ -4,14 +4,19 @@ This repository builds upon the work from [rpg_mpc](https://github.com/uzh-rpg/r
 
 ## Installation
 
-### Prerequisite
+### 1. Prerequisite
 
-[Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page#Download): You can refer to the official website. Or simply download as follows:
+- [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page#Download): Follow the official website. Or simply download as follows:
 
-```
-sudo apt-get install libeigen3-dev
-```
+  ```
+  sudo apt-get install libeigen3-dev
+  ```
 
+- [ROS](https://wiki.ros.org/noetic/Installation/Ubuntu)
+
+- [PX4](https://docs.px4.io/main/en/)
+
+### 2. Build
 Then clone this repository into your ROS workspace and build:
 
 ```
@@ -20,17 +25,68 @@ git clone git@github.com:ChanJoon/mpcc.git
 catkin build
 ```
 
-### Usage
+## Usage
+
+We adopt PX4 simulation and two types of vehicle, Iris and Typhoon_h480.
+
+Currently, you can test this controller either circle or lemniscate trajectory.
+
 **Iris**
 ```bash
 roslaunch mpcc quadrotor_gazebo.launch #gui:=false
-rosrun mpcc test_iris_circle.launch # or test_lemniscate.launch
+roslaunch mpcc test_circle.launch # or test_lemniscate.launch
 ```
 **Typhoon_h480**
 ```bash
 roslaunch mpcc quadrotor_gazebo.launch vehicle:=typhoon_h480
-rosrun mpcc test_typhoon_circle.launch
+roslaunch mpcc test_circle.launch vehicle:=typhoon_h480
 ```
+
+Later, we will provide enhanced simulation environment.
+
+## Optimal Control Problem (OCP)
+
+### States and inputs
+
+$$
+\begin{gather}
+\textbf{x}=\begin{bmatrix}p_x, p_y, p_z, q_w, q_x, q_y, q_z, v_x, v_y, v_z, t, v_t, a_t\end{bmatrix}\\
+\textbf{u}=\begin{bmatrix}T, w_x, w_y, w_z, \bar{J_t}\end{bmatrix}
+\end{gather}
+$$
+
+### Cost function 
+
+$$\begin{align}
+J&=\sum_{k=1}^N\{\sum_{\mu=x,y,z}(\mu^{(k)}-\mu_p(t^{(k)}))^2-\rho\cdot v_t^{(k)}\}\\
+&=\sum_{k=1}^N\{\sum_{\mu=x,y,z}(\mu^{(k)}-\mu_p(\theta^{(k)})-v_p(\theta^{(k)})\cdot (t^{(k)}-\theta^{(k)}))^2-\rho\cdot v_t^{(k)}\}\\
+&\text{omit time step (k) for readability}\\
+&=\sum_{k=1}^N\begin{bmatrix}p_x\cr p_z\cr p_z\cr t\end{bmatrix}^T
+\begin{bmatrix}1 & 0 & 0 & -v_{ref.x}(\theta)\cr 0 & 1 & 0 & -v_{ref.y}(\theta)\cr 0 & 0 & 1 & -v_{ref.z}(\theta) \cr -v_{ref.x}(\theta) & -v_{ref.y}(\theta) & -v_{ref.z}(\theta) & \sum v_{ref}(\theta)^2\end{bmatrix}
+\begin{bmatrix}p_x\cr p_z\cr p_z\cr t\end{bmatrix}
++\begin{bmatrix}2(-p_{ref.x}(\theta)+v_{ref.x}(\theta)\cdot \theta)\cr 2(-p_{ref.y}(\theta)+v_{ref.y}(\theta)\cdot \theta)\cr 2(-p_{ref.z}(\theta)+v_{ref.z}(\theta)\cdot \theta)\cr -2\sum v_{ref}(\theta)(-p_{ref}(\theta)+v_{ref}(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T
+\begin{bmatrix}p_x\cr p_z\cr p_z\cr t\cr v_t\end{bmatrix}
+\end{align}$$
+
+---
+*Convert quadratic form(OSQP) to a weighted $`l_2`$-norm(ACADO)*
+
+$$\begin{align}
+&=\sum_{k=1}^N\| \begin{bmatrix}p_x\cr p_y\cr p_z\cr t\cr v_t\end{bmatrix} - \begin{bmatrix}0\cr 0 \cr 0\cr 0\cr 0\end{bmatrix} \|^2_Q + \| \begin{bmatrix}T\cr w\cr \bar{J_t}\end{bmatrix} - \begin{bmatrix}T_{ref}\cr w_{ref}\cr \bar{J_{t, ref}}\end{bmatrix} \|^2_R + q^T\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} \\
+&=\sum_{k=1}^N\| h(x_k, u_k) - \bar{y_k}\|^2_W+\textbf{Wlx}^Tx_k \ \text{(linear term)} \\
+&\text{Please refer to ACADO Manual p.103}\\
+s.t & \ \ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix}, Q=\begin{bmatrix}1 & 0 & 0 & -v_{ref.x}(\theta)\cr 0 & 1 & 0 & -v_{ref.y}(\theta)\cr 0 & 0 & 1 & -v_{ref.z}(\theta) \cr -v_{ref.x}(\theta) & -v_{ref.y}(\theta) & -v_{ref.z}(\theta) & \sum v_{ref}(\theta)^2\end{bmatrix},\ q=\begin{bmatrix}2(-p_{ref.x}(\theta)+v_{ref.x}(\theta)\cdot \theta)\cr 2(-p_{ref.y}(\theta)+v_{ref.y}(\theta)\cdot \theta)\cr 2(-p_{ref.z}(\theta)+v_{ref.z}(\theta)\cdot \theta)\cr -2\sum v_{ref}(\theta)(-p_{ref}(\theta)+v_{ref}(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T
+\end{align}$$
+
+## References
+ - Falanga, Davide, et al. "PAMPC: Perception-aware model predictive control for quadrotors." 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2018. https://doi.org/10.48550/arXiv.1804.04811
+ - Ji, Jialin, et al. "Cmpcc: Corridor-based model predictive contouring control for aggressive drone flight." Experimental Robotics: The 17th International Symposium. Springer International Publishing, 2021. https://doi.org/10.48550/arXiv.2007.03271
+ - Romero, Angel, et al. "Model predictive contouring control for time-optimal quadrotor flight." IEEE Transactions on Robotics 38.6 (2022): 3340-3356. https://doi.org/10.48550/arXiv.2108.13205
+
+
+## Code Structure Overview
+The whole MPC is based on ACADO (http://acado.github.io/).
+ACADO's C++ interface is used to describe the quadrotor model and parameters for transcription into a quadratic program, which is then solved with qpOASES (https://projects.coin-or.org/qpOASES). To compile and run, none of these dependencies are needed, since the generated code is already included in this repository. To modify the model and solver options, please install ACADO from http://acado.github.io/install_linux.html.
 
 ### Updates
 
@@ -115,51 +171,3 @@ rosrun mpcc test_typhoon_circle.launch
     - mpc에서는 $x^TQx+u^TRx=state^TWstate$ 로 acado QP에 넣어주는데 mpcc에서는 $x^TQx$만 사용하고자, `mpc_wrapper`에서 `Q`의 크기를 `kRefSize`로 변경함.
   - [mpc_test.h](include/mpcc/mpc_test.h): `mpc_wrapper`에 맞게 `Eigen::Matrix Q`를 선언
 </details>
-
-
-
-### The states and inputs
-
-$$
-\begin{gather}
-\textbf{x}=\begin{bmatrix}p_x, p_y, p_z, q_w, q_x, q_y, q_z, v_x, v_y, v_z, t, v_t, a_t\end{bmatrix}\\
-\textbf{u}=\begin{bmatrix}T, w_x, w_y, w_z, \bar{J_t}\end{bmatrix}
-\end{gather}
-$$
-
-### Cost function 
-
-$$
-\begin{align}
-J&=\sum_{k=1}^N\{\sum_{\mu=x,y,z}(\mu^{(k)}-\mu_p(t^{(k)}))^2-\rho\cdot v_t^{(k)}\}\\
-&=\sum_{k=1}^N\{\sum_{\mu=x,y,z}(\mu^{(k)}-\mu_p(\theta^{(k)})-v_p(\theta^{(k)})\cdot (t^{(k)}-\theta^{(k)}))^2-\rho\cdot v_t^{(k)}\}\\
-&\text{omit time step (k) for readability}\\
-&=\sum_{k=1}^N\begin{bmatrix}p_x\cr p_z\cr p_z\cr t\end{bmatrix}^T
-\begin{bmatrix}1 & 0 & 0 & -v_{ref.x}(\theta)\cr 0 & 1 & 0 & -v_{ref.y}(\theta)\cr 0 & 0 & 1 & -v_{ref.z}(\theta) \cr -v_{ref.x}(\theta) & -v_{ref.y}(\theta) & -v_{ref.z}(\theta) & \sum v_{ref}(\theta)^2\end{bmatrix}
-\begin{bmatrix}p_x\cr p_z\cr p_z\cr t\end{bmatrix}
-+\begin{bmatrix}2(-p_{ref.x}(\theta)+v_{ref.x}(\theta)\cdot \theta)\cr 2(-p_{ref.y}(\theta)+v_{ref.y}(\theta)\cdot \theta)\cr 2(-p_{ref.z}(\theta)+v_{ref.z}(\theta)\cdot \theta)\cr -2\sum v_{ref}(\theta)(-p_{ref}(\theta)+v_{ref}(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T
-\begin{bmatrix}p_x\cr p_z\cr p_z\cr t\cr v_t\end{bmatrix}
-\end{align}
-$$
-
----
-*Convert quadratic form(OSQP) to a weighted $`l_2`$-norm(ACADO)*
-
-$$
-\begin{align}
-&=\sum_{k=1}^N\| \begin{bmatrix}p_x\cr p_y\cr p_z\cr t\cr v_t\end{bmatrix} - \begin{bmatrix}0\cr 0 \cr 0\cr 0\cr 0\end{bmatrix} \|^2_Q + \| \begin{bmatrix}T\cr w\cr \bar{J_t}\end{bmatrix} - \begin{bmatrix}T_{ref}\cr w_{ref}\cr \bar{J_{t, ref}}\end{bmatrix} \|^2_R + q^T\begin{bmatrix}\mu\cr t\cr v_t\end{bmatrix} \\
-&=\sum_{k=1}^N\| h(x_k, u_k) - \bar{y_k}\|^2_W+\textbf{Wlx}^Tx_k \ \text{(linear term)} \\
-&\text{Please refer to ACADO Manual p.103}\\
-s.t & \ \ \mu=\begin{bmatrix}p_x, p_y, p_z\end{bmatrix}, Q=\begin{bmatrix}1 & 0 & 0 & -v_{ref.x}(\theta)\cr 0 & 1 & 0 & -v_{ref.y}(\theta)\cr 0 & 0 & 1 & -v_{ref.z}(\theta) \cr -v_{ref.x}(\theta) & -v_{ref.y}(\theta) & -v_{ref.z}(\theta) & \sum v_{ref}(\theta)^2\end{bmatrix},\ q=\begin{bmatrix}2(-p_{ref.x}(\theta)+v_{ref.x}(\theta)\cdot \theta)\cr 2(-p_{ref.y}(\theta)+v_{ref.y}(\theta)\cdot \theta)\cr 2(-p_{ref.z}(\theta)+v_{ref.z}(\theta)\cdot \theta)\cr -2\sum v_{ref}(\theta)(-p_{ref}(\theta)+v_{ref}(\theta)\cdot \theta)\cr -\rho\end{bmatrix}^T
-\end{align}
-$$
-
-### References
- - Falanga, Davide, et al. "PAMPC: Perception-aware model predictive control for quadrotors." 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2018. https://doi.org/10.48550/arXiv.1804.04811
- - Ji, Jialin, et al. "Cmpcc: Corridor-based model predictive contouring control for aggressive drone flight." Experimental Robotics: The 17th International Symposium. Springer International Publishing, 2021. https://doi.org/10.48550/arXiv.2007.03271
- - Romero, Angel, et al. "Model predictive contouring control for time-optimal quadrotor flight." IEEE Transactions on Robotics 38.6 (2022): 3340-3356. https://doi.org/10.48550/arXiv.2108.13205
-
-
-## Code Structure Overview
-The whole MPC is based on ACADO (http://acado.github.io/).
-ACADO's C++ interface is used to describe the quadrotor model and parameters for transcription into a quadratic program, which is then solved with qpOASES (https://projects.coin-or.org/qpOASES). To compile and run, none of these dependencies are needed, since the generated code is already included in this repository. To modify the model and solver options, please install ACADO from http://acado.github.io/install_linux.html.

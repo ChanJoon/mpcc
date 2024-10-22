@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<launch>  
-  <node pkg="mpcc" type="test_circle.py" name="test_circle" output="screen" />
-
-	<include file="$(find mpcc)/launch/mpcc_typhoon_test.launch" />
-
-</launch>

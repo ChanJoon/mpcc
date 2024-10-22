@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <launch>  
+  <arg name="vehicle" default="iris"/>
   <node pkg="mpcc" type="test_lemniscate.py" name="test_lemniscate" output="screen" />
 
-	<include file="$(find mpcc)/launch/mpcc_test.launch" />
+	<include file="$(find mpcc)/launch/mpcc_$(arg vehicle)_test.launch" />
 
 </launch>
