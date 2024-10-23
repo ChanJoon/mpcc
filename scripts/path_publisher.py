@@ -6,9 +6,11 @@ from nav_msgs.msg import Path
 
 class PathVisualizer:
     def __init__(self):
-        rospy.init_node('path_visualizer')
-        self.path_pub = rospy.Publisher('/uav_path', Path, queue_size=10)
-        self.pose_sub = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self.pose_callback)
+        rospy.init_node("path_visualizer")
+        self.path_pub = rospy.Publisher("/uav_path", Path, queue_size=10)
+        self.pose_sub = rospy.Subscriber(
+            "/mavros/local_position/pose", PoseStamped, self.pose_callback
+        )
         self.path = Path()
         self.path.header.frame_id = "map"
         self.path.header.stamp = rospy.Time.now()
@@ -19,8 +21,15 @@ class PathVisualizer:
         pose = PoseStamped()
         pose.header.stamp = rospy.Time.now()
         pose.header.frame_id = "map"
-        pose.pose.position = Point(msg.pose.position.x, msg.pose.position.y, msg.pose.position.z)
-        pose.pose.orientation = Quaternion(msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w)
+        pose.pose.position = Point(
+            msg.pose.position.x, msg.pose.position.y, msg.pose.position.z
+        )
+        pose.pose.orientation = Quaternion(
+            msg.pose.orientation.x,
+            msg.pose.orientation.y,
+            msg.pose.orientation.z,
+            msg.pose.orientation.w,
+        )
 
         # Append the new pose message to the path
         self.path.poses.append(pose)
@@ -33,6 +42,6 @@ class PathVisualizer:
             self.rate.sleep()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     visualizer = PathVisualizer()
     visualizer.run()

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<launch>  
+<launch>
   <arg name="vehicle" default="iris"/>
   <node pkg="mpcc" type="test_circle.py" name="test_circle" output="screen" />
 

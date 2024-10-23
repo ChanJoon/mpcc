@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<launch>  
+<launch>
   <param name="/control_hz" value="200.0" />
     <!-- Throttle mapping -->
   <param name="/norm_thrust_const" value="0.04" />
@@ -38,16 +38,16 @@
   <param name="/As_6" value="0.75"/>
 
   <param name="/K_adaacc" value="1.0"/>
-  
+
   <!-- MPCC -->
   <param name="/rho" value="0.005" />
 
   <!-- false: baseline // true: baseline+L1 -->
   <param name="/L1_on" value="true"/>
 
-  <param name="/debug" value="true"/>  
-  
+  <param name="/debug" value="true"/>
+
   <node pkg="mpcc" type="mpcc_test_node" name="mpcc_test_node" output="screen" />
   <!-- <node pkg="mpcc" type="mpcc_test_node" name="mpcc_test_node" output="screen" launch-prefix="gdb -ex run -args"/> -->
-    
+
 </launch>

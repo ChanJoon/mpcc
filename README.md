@@ -55,7 +55,7 @@ $$
 \end{gather}
 $$
 
-### Cost function 
+### Cost function
 
 $$\begin{align}
 J&=\sum_{k=1}^N\{\sum_{\mu=x,y,z}(\mu^{(k)}-\mu_p(t^{(k)}))^2-\rho\cdot v_t^{(k)}\}\\
