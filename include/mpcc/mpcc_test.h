@@ -16,7 +16,7 @@
 #include <vector>
 
 ///// Eigen
-#include <Eigen/Eigen>  // whole Eigen library: Sparse(Linearalgebra) + Dense(Core+Geometry+LU+Cholesky+SVD+QR+Eigenvalues)
+#include <Eigen/Eigen>
 #include <Eigen/Geometry>
 #include <unsupported/Eigen/MatrixFunctions>
 
@@ -43,7 +43,8 @@
 #include <mavros_msgs/CommandLong.h>  // disarming (kill service)
 #include <mavros_msgs/SetMode.h>      // offboarding
 #include <mavros_msgs/State.h>
-// MPC
+
+// MPCC
 #include "mpcc/bezier_curve.h"
 #include "mpcc/mpcc_wrapper.h"
 
@@ -52,6 +53,9 @@ using namespace std::chrono;
 using namespace Eigen;
 using namespace mpcc;
 
+/**
+ * @brief State enumeration for the state vector
+ */
 enum STATE {
   kPosX = 0,
   kPosY = 1,
@@ -68,37 +72,58 @@ enum STATE {
   kAccT = 12
 };
 
-enum INPUT { kThrust = 0, kRateX = 1, kRateY = 2, kRateZ = 3, kJerkT = 4 };
+/**
+ * @brief Input enumeration for the control input vector indices
+ */
+enum INPUT { kThrust = 0,
+             kRateX = 1,
+             kRateY = 2,
+             kRateZ = 3,
+             kJerkT = 4 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 class MPCC {
  public:
+  // ===== Control parameters ===== //
+  // Control frequency and Thrust mapping parameters
   double ctrl_hz, m_cutoff_hz, um_cutoff_hz;
   double thrust_const, thrust_offset, max_thrust, min_thrust, K_adaacc;
+
+  // Gains
+  Vector3d Kp, Kv;
+
+  // L1 adaptive control gains
   double As_1, As_2, As_3, As_4, As_5, As_6;
+
+  // Contour aggressiveness weight
   double rho;
 
+  // ===== Control flags ===== //
   bool state_check = false, target_check = false, L1_start = false;
   bool ctrl_init = false, L1_on = false, debug = false;
 
-  Vector3d gravity{Vector3d(0.0, 0.0, -9.81)}, Kp, Kv;
+  // ===== State variables ===== //
+  // gravity
+  Vector3d gravity{Vector3d(0.0, 0.0, -9.81)};
 
+  // mavros
   mavros_msgs::State curr_state;
   mavros_msgs::AttitudeTarget att_msg;
 
+  // states and targets
   Vector3d pos, vel, rpy, t_pos, t_vel, t_vel_prev, t_acc, t_rpy;
   Matrix3d rot, t_rot;
   Vector4d att, t_att;
 
   nav_msgs::Path target_traj;
 
-  // Bezier
+  //===== Bezier curve generation =====//
   BEZIER bezier;
   Matrix<double, 3, 6> points;
   Matrix<double, 3, kSamples> bezier_points;
   Matrix<double, 3, kSamples> bezier_vel;
 
-  // L1 adaptive control
+  //===== L1 adaptive control =====//
   Vector3d L1_vel_error, L1_ang_error;
   Matrix3d L1_rot_error;
 
@@ -109,7 +134,7 @@ class MPCC {
   Vector2d um_sigma;
   Vector3d ada_acc;
 
-  // MPC
+  //===== MPCC =====//
   MpcWrapper<double> mpc_wrapper_;
   thread preparation_thread_;
 
@@ -118,6 +143,7 @@ class MPCC {
   bool solve_from_scratch_ = true, preparation_ = false;
   bool changed_ = true;
 
+  // MPCC state and reference matrices for ACADO
   Matrix<double, kStateSize, 1> est_state_;
   Matrix<double, kStateSize, 1> est_state_prev;
   Matrix<double, kStateSize, kSamples + 1> reference_states_;
@@ -125,7 +151,9 @@ class MPCC {
   Matrix<double, kStateSize, kSamples + 1> predicted_states_;
   Matrix<double, kInputSize, kSamples> predicted_inputs_;
   Matrix<double, kStateSize, 1> predicted_state_i;
-  // Matrix<double, kStateSize, kStateSize> Q_;
+
+  // MPCC cost matrices
+  //  Matrix<double, kStateSize, kStateSize> Q_;
   Matrix<double, kRefSize, kRefSize * kSamples> Q_;
   Matrix<double, kInputSize, kInputSize> R_;
   // Matrix<double, kStateSize, 1> q_;
@@ -135,11 +163,13 @@ class MPCC {
   Matrix<double, kStateSize, 1> grad_y;
   Matrix<double, kStateSize, 1> grad_z;
 
-  double max_bodyrate_xy_, max_bodyrate_z_, max_throttle_, min_throttle_, max_jerk_, Q_pos_xy_,
-      Q_pos_z_, Q_attitude_, Q_velocity_, Q_vt_, Q_at_, R_thrust_, R_pitchroll_, R_yaw_, R_jt_,
-      state_cost_exponential_, input_cost_exponential_;
+  // constraints and weights
+  double max_bodyrate_xy_, max_bodyrate_z_, max_throttle_, min_throttle_, max_jerk_;
+  double Q_pos_xy_, Q_pos_z_, Q_attitude_, Q_velocity_, Q_vt_, Q_at_;
+  double R_thrust_, R_pitchroll_, R_yaw_, R_jt_;
+  double state_cost_exponential_, input_cost_exponential_;
 
-  // ROS
+  //===== ROS =====//
   ros::NodeHandle nh;
   ros::Subscriber m_state_sub, m_odom_sub, m_target_sub, m_target_traj_sub;
   ros::Publisher m_pos_ctrl_pub, m_ctbr_pub, m_pub_MPC_traj;
@@ -149,12 +179,15 @@ class MPCC {
   ros::Time ctrl_start_time, t_time, t_time_prev, t_odom, t_odom_prev, t_state;
   double dt_odom;
 
-  ///// functions
+  ///// Functions
+  // ----- ROS callbacks ----- //
   void state_cb(const mavros_msgs::State::ConstPtr& msg);
   void odom_cb(const nav_msgs::Odometry::ConstPtr& msg);
   void target_cb(const nav_msgs::Odometry::ConstPtr& msg);
   void target_traj_cb(const nav_msgs::Path::ConstPtr& msg);
   void control_timer_func(const ros::TimerEvent& event);
+
+  // ----- Control functions ----- //
   void pos_ctrl(Vector3d target_pos, Vector4d target_att);
   void pub_cmd();
   void solve_mpc();
@@ -165,6 +198,8 @@ class MPCC {
                    const Ref<const Matrix<double, kInputSize, kSamples>> inputs,
                    ros::Time& time);
   void compute_L1adaptive();
+
+  // ----- Utility functions ----- //
   double throttle_mapping(double thrust);
   double throttle_mapping_inverse(double throttle);
   Matrix3d hat_operator(Vector3d v);
@@ -244,30 +279,46 @@ void MPCC::state_cb(const mavros_msgs::State::ConstPtr& msg) {
 void MPCC::odom_cb(const nav_msgs::Odometry::ConstPtr& msg) {
   dt_odom = (msg->header.stamp - t_odom).toSec();
   t_odom = msg->header.stamp;
-  pos << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
-  att << msg->pose.pose.orientation.w, msg->pose.pose.orientation.x, msg->pose.pose.orientation.y,
+
+  pos << msg->pose.pose.position.x,
+      msg->pose.pose.position.y,
+      msg->pose.pose.position.z;
+  att << msg->pose.pose.orientation.w,
+      msg->pose.pose.orientation.x,
+      msg->pose.pose.orientation.y,
       msg->pose.pose.orientation.z;
+
+  // Ensure quaternion is in the right hemisphere (w >= 0)
   if (msg->pose.pose.orientation.w < 0) {
-    att = -att;
+    att = -att;  // flip
   }
 
   tf::Quaternion m_q(att(1), att(2), att(3), att(0));
   tf::Matrix3x3 m(m_q);
   m.getRPY(rpy(0), rpy(1), rpy(2));
+
   Quaterniond q(m_q.w(), m_q.x(), m_q.y(), m_q.z());  // tf::Quaternion -> Eigen::Quaterniond
   rot = q.normalized().toRotationMatrix();
 
   // local velocity -> global velocity
   Vector3d local_vel;
-  local_vel << msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.linear.z;
+  local_vel << msg->twist.twist.linear.x,
+      msg->twist.twist.linear.y,
+      msg->twist.twist.linear.z;
   vel = rot * local_vel;
 }
 
 void MPCC::target_cb(const nav_msgs::Odometry::ConstPtr& msg) {
   t_time = ros::Time::now();
-  t_pos << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
-  t_vel << msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.linear.z;
-  t_att << msg->pose.pose.orientation.w, msg->pose.pose.orientation.x, msg->pose.pose.orientation.y,
+  t_pos << msg->pose.pose.position.x,
+      msg->pose.pose.position.y,
+      msg->pose.pose.position.z;
+  t_vel << msg->twist.twist.linear.x,
+      msg->twist.twist.linear.y,
+      msg->twist.twist.linear.z;
+  t_att << msg->pose.pose.orientation.w,
+      msg->pose.pose.orientation.x,
+      msg->pose.pose.orientation.y,
       msg->pose.pose.orientation.z;
 
   tf::Quaternion t_q(t_att(1), t_att(2), t_att(3), t_att(0));
@@ -281,14 +332,18 @@ void MPCC::target_cb(const nav_msgs::Odometry::ConstPtr& msg) {
     t_acc = Vector3d::Zero();
     target_check = true;
   } else {
-    t_acc = (t_vel - t_vel_prev) / (t_time - t_time_prev).toSec();
+    double dt = (t_time - t_time_prev).toSec() > 1e-6 ? (t_time - t_time_prev).toSec() : 1e-6;
+    t_acc = (t_vel - t_vel_prev) / dt;
   }
+
   t_time_prev = t_time;
   t_vel_prev = t_vel;
 }
 
 void MPCC::target_traj_cb(const nav_msgs::Path::ConstPtr& msg) {
   target_traj = *msg;
+
+  // sampling interval for control points
   int total_poses = target_traj.poses.size();
   int s = (total_poses - 1) / bezier.traj_order;  // interval
 
@@ -307,8 +362,12 @@ void MPCC::control_timer_func(const ros::TimerEvent& event) {
       if (!curr_state.armed) {
         mavros_msgs::CommandBool arming_command;
         arming_command.request.value = true;
-        m_arming_client.call(arming_command);
-        ROS_WARN("Arming...");
+        if (m_arming_client.call(arming_command)) {
+          ROS_INFO_THROTTLE(1.0, "Arming request sent, success: %s",
+                            arming_command.response.success ? "true" : "false");
+        } else {
+          ROS_WARN_THROTTLE(1.0, "Failed to call arming service");
+        }
         return;
       } else if (curr_state.mode != "OFFBOARD") {
         Vector3d pos0{Vector3d(0.0, 0.0, 0.0)};
