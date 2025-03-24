@@ -24,8 +24,9 @@
 #pragma once
 
 #include <Eigen/Eigen>
-#include <log++.h>
 #include <ros/ros.h>
+
+#include "utils/log++.h"
 
 namespace mpcc {
 

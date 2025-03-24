@@ -34,10 +34,10 @@
 #include <nav_msgs/Path.h>
 #include <ros/ros.h>
 #include <sensor_msgs/Imu.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <std_msgs/Empty.h>
 
 // MAVROS
-#include <log++.h>
 #include <mavros_msgs/AttitudeTarget.h>
 #include <mavros_msgs/CommandBool.h>  // arming
 #include <mavros_msgs/CommandLong.h>  // disarming (kill service)
@@ -45,8 +45,12 @@
 #include <mavros_msgs/State.h>
 
 // MPCC
+#include "mpcc/astar.hpp"
 #include "mpcc/bezier_curve.h"
 #include "mpcc/mpcc_wrapper.h"
+#include "utils/backward.hpp"
+#include "utils/log++.h"
+#include "utils/voxel_map.hpp"
 
 using namespace std;
 using namespace std::chrono;

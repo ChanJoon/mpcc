@@ -15,7 +15,8 @@
 #include <gazebo_msgs/ModelState.h>
 #include <gazebo_msgs/ModelStates.h>
 #include <geometry_msgs/Pose.h>
-#include <log++.h>
+
+#include "utils/log++.h"
 
 using namespace std;
 

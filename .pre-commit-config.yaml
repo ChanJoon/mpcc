@@ -24,6 +24,7 @@ repos:
     rev: "v16.0.6"
     hooks:
       - id: clang-format
+        exclude: ^(include/utils/backward.hpp|include/utils/voxel_map.hpp)$
 
   - repo: https://github.com/cpplint/cpplint
     rev: "1.6.1"
@@ -33,7 +34,7 @@ repos:
           [
             "--filter=-whitespace/line_length,-legal/copyright,-build/include_order,-runtime/references,-build/c++11,-build/namespaces, -build/header_guard, -build/include_subdir",
           ]
-        exclude: '3rd_party/|qp_solver/|model/'
+        exclude: ^(3rd_party/|qp_solver/|model/|include/utils/backward.hpp|include/utils/log\+\+.h)$
 
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v3.29.1
