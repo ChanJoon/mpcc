@@ -8,13 +8,17 @@ This repository builds upon the work from [rpg_mpc](https://github.com/uzh-rpg/r
 
 - [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page#Download): Follow the official website. Or simply download as follows:
 
-  ```
+  ```bash
   sudo apt-get install libeigen3-dev
   ```
 
 - [ROS](https://wiki.ros.org/noetic/Installation/Ubuntu)
 
 - [PX4](https://docs.px4.io/main/en/)
+- GLOG
+  ```bash
+  sudo apt-get install libgoogle-glog-dev
+  ```
 
 ### 2. Build
 Then clone this repository into your ROS workspace and build:

@@ -17,7 +17,8 @@
 #include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
 
-#include "utils/voxel_map.hpp"
+#include "utils/grid_map.h"
+#include "utils/log++.h"
 
 #define IN_CLOSE_SET 'a'
 #define IN_OPEN_SET 'b'
@@ -115,7 +116,7 @@ class AStar {
          NEAR_END = 4 };
 
   //   void setEnvironment(const EDTEnvironment::Ptr &env);
-  void setVoxelMap(voxel_map::VoxelMap& voxel_map);
+  void setGridMap(GridMap::Ptr& grid_map);
   void setParam();
   void init();
   void reset();
@@ -136,7 +137,7 @@ class AStar {
 
   ros::NodeHandle lnh_{"~"};
 
-  voxel_map::VoxelMap voxel_map_;
+  GridMap::Ptr grid_map_;
 
   /* ---------- data structures ---------- */
   std::vector<NodePtr> path_node_pool_;

@@ -1,0 +1,5 @@
+DilateRadius:               0.5
+
+MapResolution:              0.25
+
+MapBound:                   [-25.0, 25.0, -25.0, 25.0, 0.0, 5.0]

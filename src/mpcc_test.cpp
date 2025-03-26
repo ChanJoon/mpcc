@@ -9,6 +9,7 @@ void signal_handler(sig_atomic_t s) {
 
 int main(int argc, char **argv) {
   signal(SIGINT, signal_handler);  // to exit program when ctrl+c
+  LOG_INIT(argv[0]);
 
   ros::init(argc, argv, "mpcc_node");
   ros::NodeHandle n("~");

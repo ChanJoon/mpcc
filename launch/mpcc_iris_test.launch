@@ -41,13 +41,64 @@
 
   <!-- MPCC -->
   <param name="/rho" value="0.005" />
+  <arg name="cloud_topic" default="/structure_map/global_gridmap"/>
+  <arg name="odom_topic" default="/mavros/local_position/odom"/>
 
   <!-- false: baseline // true: baseline+L1 -->
   <param name="/L1_on" value="true"/>
 
   <param name="/debug" value="true"/>
 
-  <node pkg="mpcc" type="mpcc_test_node" name="mpcc_test_node" output="screen" />
-  <!-- <node pkg="mpcc" type="mpcc_test_node" name="mpcc_test_node" output="screen" launch-prefix="gdb -ex run -args"/> -->
+  <node pkg="mpcc" type="mpcc_test_node" name="mpcc_test_node" output="screen" >
+    <rosparam file="$(find mpcc)/config/mpcc.yaml" command="load" />
+
+    <param name="astar/resolution" value="0.5"/>
+    <param name="astar/time_resolution" value="0.8"/>
+    <param name="astar/lambda_heuristic" value="5.0"/>
+    <param name="astar/allocate_num" value="1000000"/>
+
+    <param name="grid_map/resolution" value="0.1" />
+    <param name="grid_map/map_size_x" value="30" />
+    <param name="grid_map/map_size_y" value="30" />
+    <param name="grid_map/map_size_z" value="5" />
+    <param name="grid_map/local_update_range_x" value="40.0" />
+    <param name="grid_map/local_update_range_y" value="40.0" />
+    <param name="grid_map/local_update_range_z" value="10.0" />
+    <param name="grid_map/obstacles_inflation" value="0.099" />
+    <param name="grid_map/local_map_margin" value="30" />
+    <param name="grid_map/ground_height" value="-0.01" />
+
+    <!-- camera parameter -->
+    <param name="grid_map/cx" value="321.04638671875" />
+    <param name="grid_map/cy" value="243.44969177246094" />
+    <param name="grid_map/fx" value="387.229248046875" />
+    <param name="grid_map/fy" value="387.229248046875" />
+
+    <!-- depth filter -->
+    <param name="grid_map/use_depth_filter" value="true" />
+    <param name="grid_map/depth_filter_tolerance" value="0.15" />
+    <param name="grid_map/depth_filter_maxdist" value="5.0" />
+    <param name="grid_map/depth_filter_mindist" value="0.2" />
+    <param name="grid_map/depth_filter_margin" value="1" />
+    <param name="grid_map/k_depth_scaling_factor" value="1000.0" />
+    <param name="grid_map/skip_pixel" value="2" />
+
+    <!-- local fusion -->
+    <param name="grid_map/p_hit" value="0.65" />
+    <param name="grid_map/p_miss" value="0.35" />
+    <param name="grid_map/p_min" value="0.12" />
+    <param name="grid_map/p_max" value="0.90" />
+    <param name="grid_map/p_occ" value="0.80" />
+    <param name="grid_map/min_ray_length" value="0.1" />
+    <param name="grid_map/max_ray_length" value="4.5" />
+    <param name="grid_map/virtual_ceil_height" value="2.5" />
+    <param name="grid_map/visualization_truncate_height" value="2.4" />
+    <param name="grid_map/show_occ_time" value="false" />
+    <param name="grid_map/pose_type" value="2" />
+    <param name="grid_map/frame_id" value="map" />
+
+    <remap from="/grid_map/cloud" to="$(arg cloud_topic)" />
+    <remap from="/grid_map/odom" to="$(arg odom_topic)" />
+  </node>
 
 </launch>

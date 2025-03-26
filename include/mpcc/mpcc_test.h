@@ -49,8 +49,8 @@
 #include "mpcc/bezier_curve.h"
 #include "mpcc/mpcc_wrapper.h"
 #include "utils/backward.hpp"
+#include "utils/grid_map.h"
 #include "utils/log++.h"
-#include "utils/voxel_map.hpp"
 
 using namespace std;
 using namespace std::chrono;
@@ -175,18 +175,27 @@ class MPCC {
 
   //===== ROS =====//
   ros::NodeHandle nh;
-  ros::Subscriber m_state_sub, m_odom_sub, m_target_sub, m_target_traj_sub;
-  ros::Publisher m_pos_ctrl_pub, m_ctbr_pub, m_pub_MPC_traj;
+  ros::Subscriber m_state_sub, m_odom_sub, rviz_target_sub, m_target_sub, m_target_traj_sub;
+  ros::Publisher m_pos_ctrl_pub, m_ctbr_pub, global_path_pub, m_pub_MPC_traj;
   ros::ServiceClient m_arming_client, m_set_mode_client, m_kill_client;
   ros::Timer m_control_timer;
 
   ros::Time ctrl_start_time, t_time, t_time_prev, t_odom, t_odom_prev, t_state;
   double dt_odom;
 
+  //===== Voxel Map =====//
+  GridMap::Ptr grid_map;
+
+  //===== Astar =====//
+  AStar astar;
+  Eigen::Vector3d start_pos;
+  Eigen::Vector3d end_pos;
+
   ///// Functions
   // ----- ROS callbacks ----- //
   void state_cb(const mavros_msgs::State::ConstPtr& msg);
   void odom_cb(const nav_msgs::Odometry::ConstPtr& msg);
+  void rviz_target_cb(const geometry_msgs::PoseStamped::ConstPtr& msg);
   void target_cb(const nav_msgs::Odometry::ConstPtr& msg);
   void target_traj_cb(const nav_msgs::Path::ConstPtr& msg);
   void control_timer_func(const ros::TimerEvent& event);
@@ -248,18 +257,25 @@ class MPCC {
     nh.param("/debug", debug, true);
     nh.param("/rho", rho, 0.005);  // a weight of aggressiveness
 
+    grid_map.reset(new GridMap());
+    grid_map->initMap(nh);
+
+    astar.setGridMap(grid_map);
+    astar.setParam();
+    astar.init();
+
     // publishers
     m_pos_ctrl_pub = nh.advertise<geometry_msgs::PoseStamped>("/mavros/setpoint_position/local", 3);
     m_ctbr_pub = nh.advertise<mavros_msgs::AttitudeTarget>("/mavros/setpoint_raw/attitude", 1);
-    m_pub_MPC_traj = nh.advertise<nav_msgs::Path>("/predicted_path", 1);
+    global_path_pub = nh.advertise<nav_msgs::Path>("/astar/global_path", 1);
+    m_pub_MPC_traj = nh.advertise<nav_msgs::Path>("/mpcc/predicted_path", 1);
 
     // subscribers
     m_state_sub = nh.subscribe<mavros_msgs::State>("/mavros/state", 10, &MPCC::state_cb, this);
-    m_odom_sub =
-        nh.subscribe<nav_msgs::Odometry>("/mavros/local_position/odom", 10, &MPCC::odom_cb, this);
+    m_odom_sub = nh.subscribe<nav_msgs::Odometry>("/mavros/local_position/odom", 10, &MPCC::odom_cb, this);
+    rviz_target_sub = nh.subscribe<geometry_msgs::PoseStamped>("/move_base_simple/goal", 1, &MPCC::rviz_target_cb, this);
     m_target_sub = nh.subscribe<nav_msgs::Odometry>("/target_pos", 10, &MPCC::target_cb, this);
-    m_target_traj_sub =
-        nh.subscribe<nav_msgs::Path>("/target_traj", 10, &MPCC::target_traj_cb, this);
+    m_target_traj_sub = nh.subscribe<nav_msgs::Path>("/target_traj", 10, &MPCC::target_traj_cb, this);
 
     // service clients
     m_arming_client = nh.serviceClient<mavros_msgs::CommandBool>("/mavros/cmd/arming");
@@ -310,6 +326,52 @@ void MPCC::odom_cb(const nav_msgs::Odometry::ConstPtr& msg) {
       msg->twist.twist.linear.y,
       msg->twist.twist.linear.z;
   vel = rot * local_vel;
+}
+
+void MPCC::rviz_target_cb(const geometry_msgs::PoseStamped::ConstPtr& msg) {
+  start_pos << pos(0), pos(1), pos(2);
+
+  double z_end = pos(2);  // Default to current z height
+  Eigen::Vector3d map_origin, map_size;
+  grid_map->getRegion(map_origin, map_size);
+
+  double z_min = map_origin(2);
+  double z_max = map_origin(2) + map_size(2);
+  double z_param = fabs(msg->pose.orientation.z);  // Use orientation.z as parameter
+  z_end = z_min + z_param * (z_max - z_min);
+
+  end_pos << msg->pose.position.x, msg->pose.position.y, z_end;
+  ROS_INFO("Start: %f, %f, %f", start_pos(0), start_pos(1), start_pos(2));
+  ROS_INFO("End: %f, %f, %f", end_pos(0), end_pos(1), end_pos(2));
+
+  if (!grid_map->getInflateOccupancy(end_pos)) {
+    ROS_INFO("A* search started");
+    int status = astar.findPath(start_pos, end_pos);
+    if (status == AStar::REACH_END) {
+      ROS_INFO("Path Found !!!\n");
+
+      std::vector<Eigen::Vector3d> path;
+      path = astar.getPath();
+      nav_msgs::Path global_path;
+      global_path.header.frame_id = "map";
+      global_path.header.stamp = ros::Time::now();
+
+      for (const auto& p : path) {
+        geometry_msgs::PoseStamped pose;
+        pose.pose.position.x = p(0);
+        pose.pose.position.y = p(1);
+        pose.pose.position.z = p(2);
+        global_path.poses.push_back(pose);
+      }
+      global_path_pub.publish(global_path);
+      astar.reset();
+    } else {
+      ROS_WARN("No Path Found !!!\n");
+    }
+  } else {
+    ROS_WARN("Infeasible Position Selected !!!\n");
+  }
+  return;
 }
 
 void MPCC::target_cb(const nav_msgs::Odometry::ConstPtr& msg) {
@@ -378,10 +440,20 @@ void MPCC::control_timer_func(const ros::TimerEvent& event) {
         Vector4d att0{Vector4d(1.0, 0.0, 0.0, 0.0)};
         pos_ctrl(pos0, att0);
 
+        ros::Rate rate(10);
+        for (int i = 0; i < 10; i++) {
+          pos_ctrl(pos0, att0);
+          rate.sleep();
+        }
+
         mavros_msgs::SetMode offboarding_command;
         offboarding_command.request.custom_mode = "OFFBOARD";
-        m_set_mode_client.call(offboarding_command);
-        ROS_WARN("Offboarding...");
+        if (m_set_mode_client.call(offboarding_command)) {
+          ROS_INFO_THROTTLE(1.0, "Offboarding request sent, success: %s",
+                            offboarding_command.response.mode_sent ? "true" : "false");
+        } else {
+          ROS_WARN_THROTTLE(1.0, "Failed to call offboarding service");
+        }
 
         ctrl_start_time = ros::Time::now();
         est_state_ << 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, ctrl_start_time.toSec(), 0, 0;

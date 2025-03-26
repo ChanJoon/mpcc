@@ -8,16 +8,13 @@ AStar::~AStar() {
   }
 }
 
-void AStar::setVoxelMap(voxel_map::VoxelMap& voxel_map) {
-  voxel_map_ = voxel_map;
+void AStar::setGridMap(GridMap::Ptr& grid_map) {
+  grid_map_ = grid_map;
 }
 
 void AStar::init() {
   this->inv_resolution_ = 1.0 / resolution_;
   inv_time_resolution_ = 1.0 / time_resolution_;
-
-  origin_ = voxel_map_.getOrigin();
-  ROS_INFO("origin: %f, %f, %f", origin_(0), origin_(1), origin_(2));
 
   path_node_pool_.resize(allocate_num_);
   for (int i = 0; i < allocate_num_; i++) {
@@ -150,7 +147,7 @@ int AStar::findPath(Eigen::Vector3d _source,
           neighbor_pos = cur_pos + d_pos;
           /* ---------- check if in feasible space ---------- */
           /* inside map range */
-          if (voxel_map_.query(neighbor_pos) == 0) {
+          if (!grid_map_->isInMap(neighbor_pos) || grid_map_->getInflateOccupancy(neighbor_pos)) {
             continue;
           }
 

@@ -122,7 +122,10 @@ class Logging {
                   << "DEBUG " << str << std::endl;
         return;
       case BaseSeverity::INFO:
-        std::cout << "INFO  " << str << std::endl;
+        std::cout << "\033[32m"
+                  << "INFO  " << str << std::endl;
+        // std::cout << "\033[0m"
+        //           << "INFO  " << str << "\033[0m" << std::endl;
         return;
       case BaseSeverity::WARN:
         std::cout << "\033[33m"

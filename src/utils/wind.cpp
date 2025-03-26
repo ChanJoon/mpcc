@@ -1,12 +1,13 @@
 #include <signal.h>
 
-#include "mpcc/wind_disturbance.h"
+#include "utils/wind_disturbance.h"
 void signal_handler(sig_atomic_t s) {
   std::cout << "You pressed Ctrl + C, exiting" << std::endl;
   exit(1);
 }
 
 int main(int argc, char **argv) {
+  LOG_INIT(argv[0]);
   ros::init(argc, argv, "wind_node");
   ros::NodeHandle n("~");
 

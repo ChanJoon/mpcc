@@ -4,20 +4,21 @@
   <version>0.0.0</version>
   <description>Model Predictive Contouring Control for Quadrotors</description>
 
-  <maintainer email="as06047@yonsei.ac.kr">ChanJoon</maintainer>
+  <maintainer email="chanjoon.park@kaist.ac.kr">ChanJoon</maintainer>
 
   <license>GNU GPL</license>
 
   <buildtool_depend>catkin</buildtool_depend>
-  <buildtool_depend>catkin_simple</buildtool_depend>
 
-
-  <depend>geometry_msgs</depend>
   <depend>roscpp</depend>
   <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>mavros_msgs</depend>
   <depend>tf</depend>
+  <depend>cv_bridge</depend>
+  <build_depend>glog</build_depend>
+  <exec_depend>glog</exec_depend>
 
   <export>
   </export>
